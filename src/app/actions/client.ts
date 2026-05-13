@@ -45,7 +45,7 @@ export async function getClients() {
     }
   });
 
-  return clients;
+  return JSON.parse(JSON.stringify(clients));
 }
 
 export async function getClientById(id: string) {
@@ -57,5 +57,5 @@ export async function getClientById(id: string) {
   });
 
   if (!client) throw new Error("Client not found");
-  return client;
+  return JSON.parse(JSON.stringify(client));
 }

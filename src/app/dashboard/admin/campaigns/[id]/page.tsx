@@ -2,6 +2,7 @@ import { getCampaignById } from "@/app/actions/review";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ReviewImporter } from "./review-importer";
+import { BookmarkletGenerator } from "./bookmarklet-generator";
 import { ReviewTable } from "./review-table";
 import { notFound } from "next/navigation";
 
@@ -64,6 +65,8 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
             </div>
           </div>
         </div>
+        
+        <BookmarkletGenerator reviews={campaign.reviews} />
 
         <div className="vault-card rounded-md">
           <div className="p-4 border-b border-border bg-card/50">

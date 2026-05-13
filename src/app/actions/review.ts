@@ -52,5 +52,5 @@ export async function getCampaignById(id: string) {
   });
 
   if (!campaign) throw new Error("Campaign not found");
-  return campaign;
+  return JSON.parse(JSON.stringify(campaign));
 }

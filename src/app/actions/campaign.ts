@@ -42,7 +42,7 @@ export async function getClientCampaigns(client_id: string) {
     orderBy: { created_at: 'desc' }
   });
 
-  return campaigns;
+  return JSON.parse(JSON.stringify(campaigns));
 }
 
 export async function getAgents() {
@@ -50,8 +50,9 @@ export async function getAgents() {
   if (!session || session.user.role !== "ADMIN") throw new Error("Unauthorized");
 
   // Get all users so admin can assign themselves or agents
-  return prisma.user.findMany({
+  const agents = await prisma.user.findMany({
     select: { id: true, name: true, email: true, role: true },
     orderBy: { name: 'asc' }
   });
+  return JSON.parse(JSON.stringify(agents));
 }
