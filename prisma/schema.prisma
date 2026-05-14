@@ -1,0 +1,307 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id               String           @id @default(uuid()) @db.Uuid
+  email            String           @unique
+  name             String
+  role             Role
+  password_hash    String
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  deleted_at       DateTime?
+  audit_logs       AuditLog[]       @relation("UserAuditLogs")
+  assigned_camps   Campaign[]       @relation("AssignedAgent")
+  clients          Client[]
+  reviewed_drafts  OutboundDraft[]  @relation("ReviewedBy")
+  submitted_reqs   RemovalRequest[] @relation("SubmittedBy")
+  generated_reps   Report[]         @relation("GeneratedBy")
+  settings_updated SystemSetting[]  @relation("UpdatedBy")
+}
+
+model Client {
+  id                 String     @id @default(uuid()) @db.Uuid
+  company_name       String
+  contact_name       String
+  contact_email      String
+  phone              String?
+  notes              String?
+  deletion_country   String?    @default("Deutschland")
+  deletion_name      String?
+  deletion_signature String?
+  created_by_user_id String     @db.Uuid
+  created_at         DateTime   @default(now())
+  updated_at         DateTime   @updatedAt
+  deleted_at         DateTime?
+  campaigns          Campaign[]
+  created_by         User       @relation(fields: [created_by_user_id], references: [id])
+}
+
+model Campaign {
+  id                String           @id @default(uuid()) @db.Uuid
+  client_id         String           @db.Uuid
+  name              String
+  status            CampaignStatus   @default(ACTIVE)
+  assigned_agent_id String           @db.Uuid
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
+  completed_at      DateTime?
+  deleted_at        DateTime?
+  assigned_agent    User             @relation("AssignedAgent", fields: [assigned_agent_id], references: [id])
+  client            Client           @relation(fields: [client_id], references: [id])
+  email_threads     EmailThread[]
+  outbound_drafts   OutboundDraft[]
+  removal_requests  RemovalRequest[]
+  reports           Report[]
+  reviews           Review[]
+}
+
+model Review {
+  id                      String                 @id @default(uuid()) @db.Uuid
+  campaign_id             String                 @db.Uuid
+  reviewer_name           String?
+  review_text             String?
+  star_rating             Int
+  review_url              String
+  platform                Platform               @default(GOOGLE)
+  status                  ReviewStatus           @default(PENDING)
+  submitted_at            DateTime?
+  resolved_at             DateTime?
+  created_at              DateTime               @default(now())
+  updated_at              DateTime               @updatedAt
+  deleted_at              DateTime?
+  removal_request_reviews RemovalRequestReview[]
+  campaign                Campaign               @relation(fields: [campaign_id], references: [id])
+
+  @@unique([campaign_id, review_url])
+}
+
+model RemovalRequest {
+  id                      String                 @id @default(uuid()) @db.Uuid
+  campaign_id             String                 @db.Uuid
+  submitted_by_user_id    String                 @db.Uuid
+  submission_type         SubmissionType
+  submitted_at            DateTime
+  google_reference_id     String?
+  notes                   String?
+  created_at              DateTime               @default(now())
+  updated_at              DateTime               @updatedAt
+  outbound_drafts         OutboundDraft[]
+  reminder_schedules      ReminderSchedule[]
+  campaign                Campaign               @relation(fields: [campaign_id], references: [id])
+  submitted_by            User                   @relation("SubmittedBy", fields: [submitted_by_user_id], references: [id])
+  removal_request_reviews RemovalRequestReview[]
+}
+
+model RemovalRequestReview {
+  removal_request_id String         @db.Uuid
+  review_id          String         @db.Uuid
+  removal_request    RemovalRequest @relation(fields: [removal_request_id], references: [id])
+  review             Review         @relation(fields: [review_id], references: [id])
+
+  @@id([removal_request_id, review_id])
+}
+
+model EmailThread {
+  id                   String          @id @default(uuid()) @db.Uuid
+  campaign_id          String          @db.Uuid
+  gmail_thread_id      String
+  gmail_message_id     String
+  subject              String
+  received_at          DateTime
+  direction            Direction
+  raw_body             String
+  ai_summary           String?
+  ai_parsed_action     ParsedAction?
+  ai_confidence        Float?
+  google_response_type String?
+  processed            Boolean         @default(false)
+  created_at           DateTime        @default(now())
+  updated_at           DateTime        @updatedAt
+  campaign             Campaign        @relation(fields: [campaign_id], references: [id])
+  outbound_drafts      OutboundDraft[]
+}
+
+model ResponseTemplate {
+  id              String          @id @default(uuid()) @db.Uuid
+  name            String
+  scenario_key    String
+  subject_line    String
+  body_text       String
+  language        Language
+  is_default      Boolean
+  active          Boolean         @default(true)
+  version         Int
+  created_at      DateTime        @default(now())
+  updated_at      DateTime        @updatedAt
+  outbound_drafts OutboundDraft[]
+}
+
+model OutboundDraft {
+  id                   String            @id @default(uuid()) @db.Uuid
+  campaign_id          String            @db.Uuid
+  email_thread_id      String?           @db.Uuid
+  removal_request_id   String?           @db.Uuid
+  draft_type           DraftType
+  selected_template_id String?           @db.Uuid
+  rendered_subject     String
+  rendered_body        String
+  to_address           String
+  status               DraftStatus       @default(PENDING_REVIEW)
+  reviewed_by_user_id  String?           @db.Uuid
+  reviewed_at          DateTime?
+  sent_at              DateTime?
+  admin_note           String?
+  created_at           DateTime          @default(now())
+  updated_at           DateTime          @updatedAt
+  campaign             Campaign          @relation(fields: [campaign_id], references: [id])
+  email_thread         EmailThread?      @relation(fields: [email_thread_id], references: [id])
+  removal_request      RemovalRequest?   @relation(fields: [removal_request_id], references: [id])
+  reviewed_by          User?             @relation("ReviewedBy", fields: [reviewed_by_user_id], references: [id])
+  selected_template    ResponseTemplate? @relation(fields: [selected_template_id], references: [id])
+}
+
+model ReminderSchedule {
+  id                     String         @id @default(uuid()) @db.Uuid
+  removal_request_id     String         @db.Uuid
+  reminder_enabled       Boolean        @default(true)
+  reminder_interval_days Int            @default(14)
+  reminder_max_count     Int            @default(3)
+  reminder_count         Int            @default(0)
+  last_reminder_sent_at  DateTime?
+  next_reminder_due_at   DateTime?
+  stale                  Boolean        @default(false)
+  created_at             DateTime       @default(now())
+  updated_at             DateTime       @updatedAt
+  removal_request        RemovalRequest @relation(fields: [removal_request_id], references: [id])
+}
+
+model Report {
+  id                   String          @id @default(uuid()) @db.Uuid
+  campaign_id          String          @db.Uuid
+  generated_by_user_id String          @db.Uuid
+  file_path            String?
+  file_url             String?
+  generated_at         DateTime        @default(now())
+  delivered_at         DateTime?
+  delivery_method      DeliveryMethod?
+  created_at           DateTime        @default(now())
+  updated_at           DateTime        @updatedAt
+  campaign             Campaign        @relation(fields: [campaign_id], references: [id])
+  generated_by         User            @relation("GeneratedBy", fields: [generated_by_user_id], references: [id])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String?  @db.Uuid
+  action      String
+  entity_type String
+  entity_id   String
+  metadata    String?
+  created_at  DateTime @default(now())
+  user        User?    @relation("UserAuditLogs", fields: [user_id], references: [id])
+}
+
+model SystemSetting {
+  id                 String   @id @default(uuid()) @db.Uuid
+  setting_key        String   @unique
+  setting_value      String
+  updated_by_user_id String?  @db.Uuid
+  updated_at         DateTime @updatedAt
+  updated_by         User?    @relation("UpdatedBy", fields: [updated_by_user_id], references: [id])
+}
+
+model KnowledgeBase {
+  id         String            @id @default(uuid()) @db.Uuid
+  category   KnowledgeCategory
+  title      String
+  content    String
+  source     String
+  tags       String[]
+  priority   Int
+  active     Boolean           @default(true)
+  created_at DateTime          @default(now())
+  updated_at DateTime          @updatedAt
+}
+
+enum Role {
+  ADMIN
+  AGENT
+}
+
+enum CampaignStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum Platform {
+  GOOGLE
+}
+
+enum ReviewStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+  NEEDS_INFO
+}
+
+enum SubmissionType {
+  FORM
+  API
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+
+enum ParsedAction {
+  APPROVED
+  REJECTED
+  NEEDS_INFO
+  UNKNOWN
+}
+
+enum DraftType {
+  REPLY
+  REMINDER
+}
+
+enum DraftStatus {
+  PENDING_REVIEW
+  APPROVED
+  SENT
+  REJECTED
+}
+
+enum Language {
+  DE
+  EN
+}
+
+enum DeliveryMethod {
+  EMAIL
+  DOWNLOAD
+}
+
+enum ReportStatus {
+  PENDING_REVIEW
+  APPROVED
+  SENT
+  DOWNLOAD
+}
+
+enum KnowledgeCategory {
+  LEGAL_TEMPLATE
+  DELETION_PROCESS
+  GOOGLE_TOS
+  CASE_LAW
+  CUSTOM
+}
