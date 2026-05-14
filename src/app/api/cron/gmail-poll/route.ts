@@ -66,53 +66,14 @@ export async function GET(req: Request) {
         bodyData = Buffer.from(payload.body.data, 'base64').toString('utf-8');
       }
 
-      // We need to associate this email with a campaign.
-      // In production, you'd extract a unique Google Ticket ID and look it up in RemovalRequest,
-      // or find the associated campaign via the original out-bound thread ID.
-      // For this implementation, we will try to extract ticket ID from subject e.g., [Ticket ID: 1-12345]
-      const ticketMatch = subject?.match(/\[Ticket ID: ([^\]]+)\]/);
-      const googleTicketId = ticketMatch ? ticketMatch[1] : null;
+      const result = await processEmail({
+        subject,
+        bodyData,
+        messageId,
+        threadId
+      });
 
-      let campaignId = null;
-
-      if (googleTicketId) {
-        const request = await prisma.removalRequest.findFirst({
-          where: { google_reference_id: googleTicketId },
-          select: { campaign_id: true }
-        });
-        if (request) campaignId = request.campaign_id;
-      }
-
-      // If we still don't have a campaign ID, we might just store it as unassigned or skip.
-      // Let's assume we store it anyway if it's from google, and an admin can assign it later.
-      if (!campaignId) {
-        // Fallback: Pick the first active campaign for demo purposes if nothing matches.
-        // In reality, this email would go to an "Unassigned Inbox".
-        const fallback = await prisma.campaign.findFirst({ where: { status: 'ACTIVE' } });
-        if (fallback) campaignId = fallback.id;
-      }
-
-      if (campaignId && threadId) {
-        // Parse with Claude
-        const aiAnalysis = await parseGoogleResponse(bodyData, subject || "");
-
-        await prisma.emailThread.create({
-          data: {
-            campaign_id: campaignId,
-            gmail_thread_id: threadId,
-            gmail_message_id: messageId,
-            subject: subject || "Unknown Subject",
-            received_at: new Date(),
-            direction: "INBOUND",
-            raw_body: bodyData,
-            ai_summary: aiAnalysis.summary,
-            ai_parsed_action: aiAnalysis.parsedAction as "APPROVED" | "REJECTED" | "NEEDS_INFO" | "UNKNOWN",
-            ai_confidence: aiAnalysis.confidence,
-            google_response_type: aiAnalysis.googleResponseType,
-            processed: false
-          }
-        });
-
+      if (result.success) {
         if (msg.id) {
           await markEmailAsRead(msg.id);
         }
