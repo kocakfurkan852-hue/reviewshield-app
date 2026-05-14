@@ -3,18 +3,21 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { signOut, useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 
-export function Sidebar({ userEmail, userRole }: { userEmail: string | undefined, userRole: string | undefined }) {
-  const { data: session } = useSession();
+export function Sidebar({ 
+  userEmail, 
+  userRole, 
+  userPermissions = [] 
+}: { 
+  userEmail: string | undefined, 
+  userRole: string | undefined,
+  userPermissions?: string[]
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
-
   const isAdmin = userRole === "ADMIN";
-
-
-  const userPermissions = (session?.user as any)?.permissions || [];
 
   const adminLinks = [
     { href: "/dashboard/admin", label: "Overview", icon: <OverviewIcon />, permission: "view_dashboard" },

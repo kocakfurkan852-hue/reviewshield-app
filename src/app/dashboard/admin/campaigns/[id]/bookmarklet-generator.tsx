@@ -52,8 +52,8 @@ export function BookmarkletGenerator({ reviews }: { reviews: any[] }) {
         console.log("ReviewShield: Starting auto-fill...");
         
         /* 1. Country / Wohnsitz */
-        await findAndFill(["div[role='listbox'][aria-label*='Land']", "material-select[aria-label*='Land']", "material-select[aria-label*='Wohnsitz']"], "Deutschland", "select");
-        await sleep(500);
+        await findAndFill(["div[role='listbox'][aria-label*='Wohnsitz']", "div[role='listbox'][aria-label*='Land']", "material-select[aria-label*='Land']"], "Deutschland", "select");
+        await sleep(800);
 
         /* 2. Full Name */
         await findAndFill(["input[aria-label*='Vollständiger Name']", "input[jsname='YPqjbf'][aria-label*='Name']", "input[name='full_name']"], "Süleyman Furkan Kocak");
@@ -71,8 +71,8 @@ export function BookmarkletGenerator({ reviews }: { reviews: any[] }) {
         const reasonText = "Diese Bewertung ist rechtswidrig, da sie unwahre Tatsachenbehauptungen und Schmähkritik enthält, die gegen die Google-Richtlinien und geltendes Recht verstoßen. Es gab keinen geschäftlichen Kontakt zwischen dem Verfasser und unserem Mandanten. Wir fordern die Löschung.";
         
         /* Find all URL inputs and textareas */
-        const urlInputs = Array.from(document.querySelectorAll('input[aria-label*="URL des Inhalts"], textarea[aria-label*="URL des Inhalts"], [name^="url_"]'));
-        const reasonInputs = Array.from(document.querySelectorAll('textarea[aria-label*="Begründen Sie"], [name^="reason_"]'));
+        const urlInputs = Array.from(document.querySelectorAll('input[aria-label*="URL der mutmaßlich rechtsverletzenden Inhalte"], input[aria-label*="URL des Inhalts"], textarea[aria-label*="URL des Inhalts"], [name^="url_"]'));
+        const reasonInputs = Array.from(document.querySelectorAll('textarea[aria-label^="Begründen Sie ausführlich"], textarea[aria-label*="Begründen Sie"], [name^="reason_"]'));
         
         console.log("ReviewShield: Found " + urlInputs.length + " URL fields");
 
@@ -90,7 +90,7 @@ export function BookmarkletGenerator({ reviews }: { reviews: any[] }) {
         /* 5. Confirmation Checkbox */
         await sleep(1000);
         const checkboxes = Array.from(document.querySelectorAll("material-checkbox, [role='checkbox'], div[role='checkbox']"));
-        const confirmBox = checkboxes.find(c => c.textContent.includes('Bestätigung') || c.getAttribute('aria-label')?.includes('Bestätigung') || c.getAttribute('aria-label')?.includes('confirm'));
+        const confirmBox = checkboxes.find(c => c.textContent.includes('Bestätigung') || c.getAttribute('aria-label')?.includes('Bestätigung') || c.getAttribute('aria-label')?.includes('confirm') || c.getAttribute('aria-label')?.includes('Bestätigung aktivieren'));
         if(confirmBox) {
           const isChecked = confirmBox.classList.contains('checked') || confirmBox.getAttribute('aria-checked') === 'true';
           if (!isChecked) {

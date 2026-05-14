@@ -131,3 +131,46 @@
 .gradient-hero {
   background: linear-gradient(135deg, #0B192C 0%, #1A3E62 100%);
 }
+
+/* Starfield and Meteors */
+.star-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background: #0B192C;
+  overflow: hidden;
+}
+
+.star {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  opacity: 0.5;
+  animation: twinkle var(--duration) infinite ease-in-out;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.meteor {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: linear-gradient(to right, white, transparent);
+  border-radius: 50%;
+  filter: drop-shadow(0 0 5px white);
+  animation: meteor-shot var(--duration) infinite linear;
+  opacity: 0;
+}
+
+@keyframes meteor-shot {
+  0% { transform: rotate(-45deg) translateX(0); opacity: 0; }
+  1% { opacity: 1; }
+  10% { transform: rotate(-45deg) translateX(-1000px); opacity: 0; }
+  100% { transform: rotate(-45deg) translateX(-1000px); opacity: 0; }
+}
