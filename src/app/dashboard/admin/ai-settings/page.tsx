@@ -19,7 +19,6 @@ export default async function AISettingsPage() {
       create: {
         setting_key: key,
         setting_value: key === 'AI_PROVIDER' ? 'CLAUDE' : key === 'AI_SYSTEM_PROMPT' ? 'You are an expert lawyer specializing in reputation management...' : '',
-        description: `Configuration for ${key}`
       }
     });
   }

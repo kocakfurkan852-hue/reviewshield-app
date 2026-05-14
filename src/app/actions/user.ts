@@ -20,7 +20,7 @@ export async function createUser(data: { name: string, email: string, role: "AGE
     data: {
       name: data.name,
       email: data.email,
-      password: password, // NextAuth configuration should handle plain-text if we mocked it, or we should hash it if we are using bcrypt. Wait, the seeded user used 'admin123'. 
+      password_hash: "password123",
       role: data.role,
     }
   });
