@@ -105,3 +105,28 @@ export async function getAgents() {
   });
   return JSON.parse(JSON.stringify(agents));
 }
+
+export async function getCampaignEmails(campaignId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Unauthorized");
+
+  const emails = await prisma.emailThread.findMany({
+    where: { campaign_id: campaignId },
+    orderBy: { received_at: 'desc' },
+    select: {
+      id: true,
+      subject: true,
+      direction: true,
+      ai_parsed_action: true,
+      ai_summary: true,
+      ai_confidence: true,
+      google_response_type: true,
+      processed: true,
+      received_at: true,
+      raw_body: true,
+      gmail_thread_id: true,
+    }
+  });
+
+  return JSON.parse(JSON.stringify(emails));
+}

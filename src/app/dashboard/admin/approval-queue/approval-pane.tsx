@@ -11,8 +11,8 @@ interface Draft {
   to_address: string;
   rendered_subject: string;
   rendered_body: string;
-  campaign?: { name: string; client?: { company_name: string } };
-  email_thread?: { subject: string; raw_body: string; ai_summary?: string; ai_confidence?: number };
+  campaign?: { name: string; client?: { company_name: string } } | null;
+  email_thread?: { subject: string; raw_body: string; ai_summary?: string | null; ai_confidence?: number | null } | null;
 }
 
 export function ApprovalPane({ drafts }: { drafts: Draft[] }) {

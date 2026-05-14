@@ -1,9 +1,11 @@
 import { getCampaignById } from "@/app/actions/review";
+import { getCampaignEmails } from "@/app/actions/campaign";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ReviewImporter } from "./review-importer";
 import { BookmarkletGenerator } from "./bookmarklet-generator";
 import { ReviewTable } from "./review-table";
+import { EmailTimeline } from "./email-timeline";
 import { CampaignEditModal } from "@/components/campaign-edit-modal";
 import { notFound } from "next/navigation";
 
@@ -14,6 +16,8 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   } catch {
     notFound();
   }
+
+  const emails = await getCampaignEmails(params.id);
 
   return (
     <div className="p-8 bg-background min-h-screen">
@@ -82,6 +86,18 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
             <h2 className="text-xl font-heading font-semibold text-foreground">Tracked Reviews</h2>
           </div>
           <ReviewTable campaignId={campaign.id} reviews={campaign.reviews} client={campaign.client} />
+        </div>
+
+        <div className="vault-card rounded-md mt-8">
+          <div className="p-4 border-b border-border bg-card/50">
+            <h2 className="text-xl font-heading font-semibold text-foreground flex items-center gap-2">
+              📧 Email Activity
+              <span className="text-sm font-normal text-muted-foreground">({emails.length})</span>
+            </h2>
+          </div>
+          <div className="p-4">
+            <EmailTimeline emails={emails} />
+          </div>
         </div>
       </div>
     </div>

@@ -39,6 +39,34 @@ export default async function AdminDashboard() {
           </div>
         </div>
 
+        {/* Email Pipeline Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="vault-card p-6 rounded-md border border-blue-500/20 bg-blue-500/5">
+            <p className="text-sm font-bold text-blue-400 uppercase tracking-wider mb-2">📧 Emails Tracked</p>
+            <p className="text-4xl font-heading font-bold text-foreground">{stats.totalEmails}</p>
+            {stats.unprocessedEmails > 0 && (
+              <p className="text-xs text-amber-400 mt-2 font-medium">
+                ⚠ {stats.unprocessedEmails} unprocessed
+              </p>
+            )}
+          </div>
+          <div className="vault-card p-6 rounded-md border border-violet-500/20 bg-violet-500/5">
+            <p className="text-sm font-bold text-violet-400 uppercase tracking-wider mb-2">⏰ Due Reminders</p>
+            <p className="text-4xl font-heading font-bold text-foreground">{stats.dueReminders}</p>
+            <p className="text-xs text-muted-foreground mt-2">Auto-sent daily at 8am UTC</p>
+          </div>
+          <div className="vault-card p-6 rounded-md">
+            <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">🔍 Last Gmail Scan</p>
+            <p className="text-lg font-heading font-semibold text-foreground">
+              {stats.lastScanTime
+                ? new Date(stats.lastScanTime).toLocaleString()
+                : "Never"
+              }
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">Scans every 2 hours</p>
+          </div>
+        </div>
+
         {/* Activity Feed */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 vault-card rounded-md">

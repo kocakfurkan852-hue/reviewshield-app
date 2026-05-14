@@ -55,3 +55,90 @@ export async function markEmailAsRead(messageId: string) {
     },
   });
 }
+
+/**
+ * Send an email via Gmail API.
+ * Supports threaded replies via optional threadId.
+ */
+export async function sendEmail({
+  to,
+  subject,
+  body,
+  threadId,
+  inReplyTo,
+}: {
+  to: string;
+  subject: string;
+  body: string;
+  threadId?: string;
+  inReplyTo?: string;
+}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  if (!REFRESH_TOKEN) {
+    console.error("Gmail API not configured. Missing REFRESH_TOKEN. Cannot send email.");
+    return { success: false, error: "Gmail not configured — missing REFRESH_TOKEN" };
+  }
+
+  try {
+    // Build RFC 2822 email
+    const headers = [
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      `Content-Type: text/plain; charset="UTF-8"`,
+      `MIME-Version: 1.0`,
+    ];
+
+    if (inReplyTo) {
+      headers.push(`In-Reply-To: ${inReplyTo}`);
+      headers.push(`References: ${inReplyTo}`);
+    }
+
+    const rawEmail = `${headers.join("\r\n")}\r\n\r\n${body}`;
+
+    // Base64url encode
+    const encodedMessage = Buffer.from(rawEmail)
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    const sendParams: any = {
+      userId: "me",
+      requestBody: {
+        raw: encodedMessage,
+      },
+    };
+
+    // Thread the reply if we have a threadId
+    if (threadId) {
+      sendParams.requestBody.threadId = threadId;
+    }
+
+    const result = await gmail.users.messages.send(sendParams);
+
+    console.log(`Email sent successfully. Message ID: ${result.data.id}`);
+    return { success: true, messageId: result.data.id || undefined };
+  } catch (error) {
+    console.error("Gmail sendEmail Error:", error);
+    const err = error as Error;
+    return { success: false, error: err.message || "Unknown send error" };
+  }
+}
+
+/**
+ * Check if Gmail OAuth is configured and the token is valid.
+ */
+export async function checkGmailHealth(): Promise<{ configured: boolean; valid: boolean; error?: string }> {
+  if (!REFRESH_TOKEN) {
+    return { configured: false, valid: false, error: "Missing GMAIL_REFRESH_TOKEN" };
+  }
+
+  try {
+    // Try to list labels — lightweight API call to verify token
+    await gmail.users.labels.list({ userId: "me" });
+    return { configured: true, valid: true };
+  } catch (error) {
+    const err = error as Error;
+    return { configured: true, valid: false, error: err.message };
+  }
+}
+

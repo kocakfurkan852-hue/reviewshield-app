@@ -19,13 +19,23 @@ export default function LoginPage() {
       email,
       password,
     });
+    
     if (res?.error) {
-      setError(res.error);
+      setError("Invalid email or password");
     } else {
-      router.push("/dashboard/admin");
+      // Fetch session to get the role
+      const sessionRes = await fetch("/api/auth/session");
+      const session = await sessionRes.json();
+      
+      if (session?.user?.role === "ADMIN") {
+        router.push("/dashboard/admin");
+      } else {
+        router.push("/dashboard/agent");
+      }
       router.refresh();
     }
   };
+
 
   return (
     <div className="flex h-screen items-center justify-center bg-background">

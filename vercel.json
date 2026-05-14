@@ -2,7 +2,16 @@
   "crons": [
     {
       "path": "/api/cron/gmail-poll",
-      "schedule": "0 0 * * *"
+      "schedule": "0 */2 * * *"
+    },
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/verify-deletions",
+      "schedule": "0 6 * * 1"
     }
   ]
 }
+
