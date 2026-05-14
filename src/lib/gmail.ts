@@ -18,7 +18,7 @@ if (REFRESH_TOKEN) {
 
 export const gmail = google.gmail({ version: "v1", auth: oAuth2Client });
 
-export async function fetchUnreadEmails() {
+export async function fetchUnreadEmails(query: string = "is:unread from:google.com") {
   if (!REFRESH_TOKEN) {
     console.warn("Gmail API not configured. Missing REFRESH_TOKEN.");
     return [];
@@ -26,7 +26,7 @@ export async function fetchUnreadEmails() {
 
   const res = await gmail.users.messages.list({
     userId: "me",
-    q: "is:unread from:google.com",
+    q: query,
     maxResults: 20,
   });
 

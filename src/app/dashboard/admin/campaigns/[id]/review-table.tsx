@@ -71,20 +71,91 @@ export function ReviewTable({ campaignId, reviews, client }: { campaignId: strin
 
     const reasoning = `Sehr geehrte Damen und Herren,\n\ndie vorliegende Bewertung ist aus folgenden Gründen zu löschen:\n\nDer Rezensent war niemals Kunde unseres Unternehmens. Eine Geschäftsbeziehung bestand zu keinem Zeitpunkt.\n\nNach ständiger Rechtsprechung sind Bewertungen ohne tatsächliche Geschäftsbeziehung unzulässig und verletzen das Persönlichkeitsrecht des Unternehmens (BGH, Urt. 01.03.2016, VI ZR 34/15). Die Bewertung verursacht erheblichen wirtschaftlichen Schaden.\n\nSie werden hiermit aufgefordert, Ihren vom BGH auferlegten Pflichten nachzukommen:\n\n1) Diese Beanstandung an den Verfasser weiterzuleiten\n2) Den Verfasser zur Stellungnahme aufzufordern mit Nachweis der Geschäftsbeziehung (Kundenkontakt, Rechnungen etc.)\n3) Die Rezension bei Nichtreaktion oder fehlendem Nachweis zu entfernen (BGH, Urt. 25.10.2011, VI ZR 93/10)\n\nWir erwarten Ihre Rückmeldung bis zum ${new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')}.`;
 
-    // Note: To properly automate filling the Google Form in a bookmarklet, one would need to inspect Google's DOM. 
-    // This script mocks the process and is a placeholder for the actual DOM logic.
     return `javascript:(function(){
-      alert('ReviewShield: Fülle Google Formular aus für ${chunk.length} Reviews...\\n\\nWohnsitz: ${delCountry}\\nName: ${delName}\\nUnterschrift: ${delSignature}');
-      console.log('Inserting into textareas:', \`${urlsAndText}\`);
-      console.log('Inserting reasoning:', \`${reasoning}\`);
+      function findInputByLabel(text) {
+        const labels = Array.from(document.querySelectorAll('label, div[role="heading"], span'));
+        const label = labels.find(l => l.innerText.toLowerCase().includes(text.toLowerCase()));
+        if (!label) return null;
+        if (label.htmlFor) return document.getElementById(label.htmlFor);
+        const inputInside = label.querySelector('input, textarea, select');
+        if (inputInside) return inputInside;
+        let current = label;
+        while (current && current.nextElementSibling) {
+          current = current.nextElementSibling;
+          const input = current.querySelector('input, textarea, select');
+          if (input) return input;
+          if (['INPUT','TEXTAREA','SELECT'].includes(current.tagName)) return current;
+        }
+        const container = label.closest('div[role="listitem"]') || label.closest('.lrHppe');
+        if (container) return container.querySelector('input:not([type="hidden"]), textarea, select');
+        return null;
+      }
+      function simulateTyping(element, text) {
+        if (!element) return;
+        element.focus();
+        const setter = Object.getOwnPropertyDescriptor(window[element.tagName === 'TEXTAREA' ? 'HTMLTextAreaElement' : 'HTMLInputElement'].prototype, "value").set;
+        setter.call(element, text);
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        element.blur();
+      }
+      function clickRadioOrCheckbox(text) {
+        const labels = Array.from(document.querySelectorAll('label, span, div'));
+        const label = labels.find(l => l.innerText.trim() === text);
+        if (label) {
+            label.click();
+            const input = label.closest('div')?.querySelector('input[type="radio"], input[type="checkbox"]');
+            if (input) {
+                input.checked = true;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+      }
+      const countryInput = findInputByLabel("Land Ihres Wohnsitzes") || findInputByLabel("Country of residence");
+      if(countryInput) {
+          if(countryInput.tagName === 'SELECT') {
+              Array.from(countryInput.options).forEach(opt => {
+                  if(opt.text.includes('${delCountry}')) countryInput.value = opt.value;
+              });
+              countryInput.dispatchEvent(new Event('change', {bubbles: true}));
+          } else {
+              simulateTyping(countryInput, '${delCountry}');
+          }
+      }
+      simulateTyping(findInputByLabel("Vollständiger Name"), '${delName}');
+      clickRadioOrCheckbox("Mich selbst");
+      clickRadioOrCheckbox("Myself");
+      
+      const urlsAndText = \`${urlsAndText.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\`;
+      const reasoning = \`${reasoning.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\`;
+      
+      const textareas = Array.from(document.querySelectorAll('textarea'));
+      if (textareas.length > 0) {
+          const reasonBox = findInputByLabel("Begründung") || findInputByLabel("grund") || textareas[textareas.length - 1];
+          if (reasonBox) simulateTyping(reasonBox, reasoning);
+          const urlBox = findInputByLabel("URL") || textareas[0];
+          if (urlBox && urlBox !== reasonBox) {
+              simulateTyping(urlBox, urlsAndText);
+          } else if (textareas.length === 1) {
+              simulateTyping(textareas[0], urlsAndText + '\\n\\nBegründung:\\n' + reasoning);
+          }
+      }
+      
+      clickRadioOrCheckbox("Ich schwöre an Eides statt");
+      clickRadioOrCheckbox("Ich versichere an Eides statt");
+      clickRadioOrCheckbox("zur Bestätigung aktivieren");
+      document.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.click(); cb.checked = true; cb.dispatchEvent(new Event('change', {bubbles: true})); });
+      
+      simulateTyping(findInputByLabel("Unterschrift"), '${delSignature}');
+      alert('ReviewShield: Automatisierung abgeschlossen. Bitte überprüfen Sie die Eingaben und füllen Sie ggf. das Captcha aus, bevor Sie auf Senden klicken.');
     })();`;
   };
 
   return (
     <div className="space-y-4">
       {showAutoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm overflow-y-auto">
-          <div className="vault-card p-6 rounded-md w-full max-w-4xl shadow-xl relative border border-border mt-32 mb-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-md overflow-y-auto">
+          <div className="vault-card bg-card p-6 rounded-md w-full max-w-4xl shadow-2xl relative border border-border mt-32 mb-8">
             <button 
               onClick={() => setShowAutoModal(false)}
               className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"

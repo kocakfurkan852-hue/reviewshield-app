@@ -11,7 +11,33 @@ export async function GET(req: Request) {
   }
 
   try {
-    const unreadMessages = await fetchUnreadEmails();
+    const settings = await prisma.systemSetting.findMany();
+    const getSetting = (k: string, defaultVal: string) => settings.find(s => s.setting_key === k)?.setting_value || defaultVal;
+    
+    if (getSetting('EMAIL_SCAN_ENABLED', 'true') === 'false') {
+        return NextResponse.json({ success: true, message: "Scanning disabled by admin." });
+    }
+
+    const frequency = getSetting('EMAIL_SCAN_FREQUENCY', 'HOURLY');
+    const lastScanTime = parseInt(getSetting('LAST_SCAN_TIME', '0'), 10);
+    const now = Date.now();
+    const timeDiff = now - lastScanTime;
+    
+    if (frequency === 'DAILY' && timeDiff < 86400000) {
+        return NextResponse.json({ success: true, message: "Skipping, daily threshold not met." });
+    } else if (frequency === 'WEEKLY' && timeDiff < 604800000) {
+        return NextResponse.json({ success: true, message: "Skipping, weekly threshold not met." });
+    }
+
+    await prisma.systemSetting.upsert({
+        where: { setting_key: 'LAST_SCAN_TIME' },
+        update: { setting_value: now.toString() },
+        create: { setting_key: 'LAST_SCAN_TIME', setting_value: now.toString() }
+    });
+
+    const customQuery = getSetting('EMAIL_SCAN_QUERY', 'is:unread from:removals@google.com');
+
+    const unreadMessages = await fetchUnreadEmails(customQuery);
     
     if (unreadMessages.length === 0) {
       return NextResponse.json({ success: true, message: "No new emails found.", processed: 0 });

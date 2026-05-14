@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 
 export async function createUser(data: { name: string, email: string, role: "AGENT" | "ADMIN" }) {
   const session = await getServerSession(authOptions);
@@ -15,12 +16,13 @@ export async function createUser(data: { name: string, email: string, role: "AGE
   // Hardcoded password for now since there's no email flow.
   // In a real app, you'd send an invite email or generate a random password.
   const password = "password123";
+  const password_hash = bcrypt.hashSync(password, 10);
 
   await prisma.user.create({
     data: {
       name: data.name,
       email: data.email,
-      password_hash: "password123",
+      password_hash: password_hash,
       role: data.role,
     }
   });
