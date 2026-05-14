@@ -17,42 +17,68 @@ export function BookmarkletGenerator({ reviews }: { reviews: any[] }) {
   // The JS code that will be injected into the bookmarklet
   const bookmarkletCode = `javascript:(function(){
     try {
-      /* This is a mockup for the Google Support Form */
-      /* Sets Wohnsitz to Deutschland */
-      const countrySelect = document.querySelector('select[name="country"]');
-      if (countrySelect) { countrySelect.value = "DE"; countrySelect.dispatchEvent(new Event("change")); }
+      console.log("ReviewShield: Starting auto-fill...");
       
-      /* Checks "mich selbst" */
-      const myselfRadio = document.querySelector('input[value="myself"]');
-      if (myselfRadio) { myselfRadio.checked = true; myselfRadio.dispatchEvent(new Event("change")); }
+      const findAndFill = (selectors, value, type = "input") => {
+        for (const selector of selectors) {
+          const el = document.querySelector(selector);
+          if (el) {
+            console.log("ReviewShield: Found " + selector);
+            if (type === "input") {
+              el.value = value;
+              el.dispatchEvent(new Event("input", { bubbles: true }));
+              el.dispatchEvent(new Event("change", { bubbles: true }));
+            } else if (type === "click") {
+              el.click();
+            } else if (type === "select") {
+              // Material selects are tricky, often need a click then finding the option
+              el.click();
+              setTimeout(() => {
+                const option = Array.from(document.querySelectorAll('material-select-item, [role="option"]'))
+                  .find(opt => opt.textContent.includes(value));
+                if (option) option.click();
+              }, 500);
+            }
+            return true;
+          }
+        }
+        return false;
+      };
 
-      /* Inputs name */
-      const nameInput = document.querySelector('input[name="full_name"]');
-      if (nameInput) { nameInput.value = "Süleyman Furkan Kocak"; nameInput.dispatchEvent(new Event("input")); }
+      /* 1. Country / Wohnsitz */
+      findAndFill(["material-select[aria-label='Land Ihres Wohnsitzes']", "[name='country_of_residence']", "material-select[aria-label*='Land']"], "Deutschland", "select");
 
-      /* Populates URLs */
+      /* 2. Full Name */
+      findAndFill(["input[aria-label='Vollständiger Name']", "[name='full_name']", "input[aria-label*='Name']"], "Süleyman Furkan Kocak");
+
+      /* 3. Acting on behalf of myself */
+      const myself = Array.from(document.querySelectorAll('material-radio')).find(r => r.textContent.includes('meinem eigenen Namen') || r.textContent.includes('myself'));
+      if (myself) myself.click();
+
+      /* 4. URLs and Reasons */
       const urls = ${JSON.stringify(urls)};
-      const reasonText = "Sehr geehrte Damen und Herren,\\n\\ndiese Bewertung verstößt gegen die Richtlinien und stellt eine Rechtsverletzung dar. Wir bitten um umgehende Löschung.\\n\\nMit freundlichen Grüßen,\\nSüleyman Furkan Kocak";
+      const reasonText = "Sehr geehrte Damen und Herren,\\n\\ndiese Bewertung verstößt gegen die Richtlinien (unwahre Tatsachenbehauptung/Schmähkritik) und stellt eine Rechtsverletzung dar. Wir bitten um umgehende Löschung.\\n\\nMit freundlichen Grüßen,\\nSüleyman Furkan Kocak";
       
-      let urlInputs = document.querySelectorAll('input[name^="url_"]');
-      let reasonInputs = document.querySelectorAll('textarea[name^="reason_"]');
+      const urlInputs = document.querySelectorAll('input[aria-label*="URL"], [name^="url_"]');
+      const reasonInputs = document.querySelectorAll('textarea[aria-label*="Begründen Sie"], [name^="reason_"]');
       
-      /* If Google requires clicking 'Add more' to show 10 fields, we'd trigger that here */
-      /* For now, just fill whatever fields exist */
       for(let i=0; i<Math.min(urls.length, urlInputs.length); i++) {
         urlInputs[i].value = urls[i];
-        urlInputs[i].dispatchEvent(new Event("input"));
+        urlInputs[i].dispatchEvent(new Event("input", { bubbles: true }));
         if(reasonInputs[i]) {
           reasonInputs[i].value = reasonText;
-          reasonInputs[i].dispatchEvent(new Event("input"));
+          reasonInputs[i].dispatchEvent(new Event("input", { bubbles: true }));
         }
       }
       
-      /* Sign bottom */
-      const signatureInput = document.querySelector('input[name="signature"]');
-      if(signatureInput) { signatureInput.value = "Süleyman Furkan Kocak"; signatureInput.dispatchEvent(new Event("input")); }
+      /* 5. Confirmation Checkbox */
+      const checkbox = document.querySelector("material-checkbox[aria-label*='Zur Bestätigung aktivieren'], material-checkbox[aria-label*='confirm']");
+      if(checkbox && !checkbox.classList.contains('checked')) checkbox.click();
+
+      /* 6. Signature */
+      findAndFill(["input[aria-label='Unterschrift']", "[name='signature']", "input[aria-label*='Unterschrift']"], "Süleyman Furkan Kocak");
       
-      alert("ReviewShield: Form auto-filled with " + urls.length + " reviews! Please complete the Captcha and submit.");
+      alert("ReviewShield: Form auto-filled with " + urls.length + " reviews! Please check the country field, complete the Captcha and submit.");
     } catch(e) {
       alert("ReviewShield Bookmarklet Error: " + e.message);
     }

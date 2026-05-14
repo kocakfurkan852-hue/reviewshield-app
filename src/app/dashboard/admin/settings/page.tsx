@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { changePassword } from "@/app/actions/password";
+import { PasswordForm } from "@/components/password-form";
 import { revalidatePath } from "next/cache";
 
 export default async function SettingsPage() {
@@ -52,17 +52,7 @@ export default async function SettingsPage() {
           <p className="text-muted-foreground mb-4">Manage your personal account settings.</p>
           <div className="vault-card rounded-md p-6 border-border">
             <h2 className="text-xl font-semibold text-foreground mb-4">Change Password</h2>
-            <form action={changePassword} className="space-y-4 max-w-sm">
-              <div className="space-y-2">
-                <label className="text-sm text-foreground">New Password</label>
-                <Input type="password" name="newPassword" required className="bg-transparent border-border" minLength={6} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm text-foreground">Confirm Password</label>
-                <Input type="password" name="confirmPassword" required className="bg-transparent border-border" minLength={6} />
-              </div>
-              <Button type="submit" className="starlight-btn w-full">Update Password</Button>
-            </form>
+            <PasswordForm />
           </div>
         </section>
 

@@ -1,16 +1,20 @@
-import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Sidebar } from "@/components/sidebar";
 import { StarsBackground } from "@/components/stars-background";
+import { redirect } from "next/navigation";
 
-export default async function AdminLayout({
+export default async function AgentLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const session = await getServerSession(authOptions);
   
+  if (!session) {
+    redirect("/login");
+  }
+
   return (
     <div className="flex h-screen bg-background overflow-hidden selection:bg-primary/30">
       <StarsBackground />
