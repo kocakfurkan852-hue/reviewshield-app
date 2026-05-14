@@ -42,6 +42,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
+          permissions: user.permissions
         };
       }
     })
@@ -53,6 +54,8 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         token.role = (user as any).role;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        token.permissions = (user as any).permissions;
       }
       return token;
     },
@@ -62,6 +65,8 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.id as string;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (session.user as any).role = token.role as string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (session.user as any).permissions = token.permissions as string[];
       }
       return session;
     }

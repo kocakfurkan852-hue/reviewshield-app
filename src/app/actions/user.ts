@@ -34,13 +34,15 @@ export async function updateUser(id: string, data: { name?: string, email?: stri
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "ADMIN") throw new Error("Unauthorized");
 
-  const updateData: any = { ...data };
-  if (data.password) {
-    updateData.password_hash = bcrypt.hashSync(data.password, 10);
-    delete updateData.password;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { password, ...otherData } = data;
+  const updateData: any = { ...otherData };
+  
+  if (password && password.trim().length >= 6) {
+    updateData.password_hash = bcrypt.hashSync(password, 10);
   }
 
-  await prisma.user.update({
+  const updatedUser = await prisma.user.update({
     where: { id },
     data: updateData
   });
@@ -48,6 +50,7 @@ export async function updateUser(id: string, data: { name?: string, email?: stri
   revalidatePath("/dashboard/admin/users");
   return { success: true };
 }
+
 
 export async function deleteUser(id: string) {
   const session = await getServerSession(authOptions);
@@ -67,8 +70,17 @@ export async function getUsers() {
   if (!session || session.user.role !== "ADMIN") throw new Error("Unauthorized");
 
   const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      permissions: true,
+      created_at: true,
+    },
     orderBy: { created_at: 'desc' }
   });
 
   return JSON.parse(JSON.stringify(users));
 }
+

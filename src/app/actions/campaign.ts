@@ -65,7 +65,37 @@ export async function getClientCampaigns(client_id: string) {
   return JSON.parse(JSON.stringify(campaigns));
 }
 
+export async function updateCampaign(id: string, data: { name?: string, status?: any, agent_ids?: string[] }) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "ADMIN") throw new Error("Unauthorized");
+
+  const campaign = await prisma.campaign.findUnique({ where: { id } });
+  if (!campaign) throw new Error("Campaign not found");
+
+  const updateData: any = {};
+  if (data.name) updateData.name = data.name;
+  if (data.status) updateData.status = data.status;
+
+  if (data.agent_ids) {
+    // Delete old assignments and create new ones
+    updateData.assignments = {
+      deleteMany: {},
+      create: data.agent_ids.map(uid => ({ user_id: uid }))
+    };
+  }
+
+  await prisma.campaign.update({
+    where: { id },
+    data: updateData
+  });
+
+  revalidatePath(`/dashboard/admin/clients/${campaign.client_id}`);
+  revalidatePath("/dashboard/admin/clients");
+  return { success: true };
+}
+
 export async function getAgents() {
+
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "ADMIN") throw new Error("Unauthorized");
 

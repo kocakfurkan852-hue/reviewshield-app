@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ReviewImporter } from "./review-importer";
 import { BookmarkletGenerator } from "./bookmarklet-generator";
 import { ReviewTable } from "./review-table";
+import { CampaignEditModal } from "@/components/campaign-edit-modal";
 import { notFound } from "next/navigation";
 
 export default async function CampaignDetailPage({ params }: { params: { id: string } }) {
@@ -35,12 +36,14 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
               {campaign.assignments.length === 0 && <span className="text-xs text-muted-foreground italic">No one assigned</span>}
             </div>
           </div>
-          <div className="text-right">
-            <span className="inline-block px-3 py-1 rounded-full bg-primary/20 text-primary text-sm font-semibold mb-2">
+          <div className="flex flex-col items-end gap-3">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/20 text-primary text-sm font-semibold">
               Status: {campaign.status}
             </span>
+            <CampaignEditModal campaign={campaign} />
           </div>
         </div>
+
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           <div className="flex gap-4">

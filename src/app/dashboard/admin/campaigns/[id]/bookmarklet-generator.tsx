@@ -26,23 +26,20 @@ export function BookmarkletGenerator({ reviews }: { reviews: any[] }) {
             console.log("ReviewShield: Found " + selector);
             if (type === "input") {
               el.value = value;
+              el.setAttribute('value', value);
               el.dispatchEvent(new Event("input", { bubbles: true }));
               el.dispatchEvent(new Event("change", { bubbles: true }));
+              el.dispatchEvent(new Event("blur", { bubbles: true }));
             } else if (type === "click") {
               el.click();
             } else if (type === "select") {
               el.click();
               await sleep(800);
-              const options = Array.from(document.querySelectorAll('material-select-item, [role="option"], .material-select-dropdown material-select-item'));
-              const option = options.find(opt => opt.textContent.trim().toLowerCase().includes(value.toLowerCase()));
+              const options = Array.from(document.querySelectorAll('material-select-item, [role="option"], .material-select-dropdown material-select-item, div[role="listbox"] div[role="option"]'));
+              const option = options.find(opt => opt.textContent.trim().toLowerCase().includes(value.toLowerCase()) || opt.getAttribute('data-value') === 'DE');
               if (option) {
                 option.click();
                 console.log("ReviewShield: Selected " + value);
-              } else {
-                console.log("ReviewShield: Could not find option " + value);
-                /* Try a backup: sometimes the value is in an attribute */
-                const backup = options.find(opt => opt.getAttribute('value') === 'DE' || opt.getAttribute('data-value') === 'DE');
-                if (backup) backup.click();
               }
             }
             return true;
@@ -52,25 +49,30 @@ export function BookmarkletGenerator({ reviews }: { reviews: any[] }) {
       };
 
       (async () => {
+        console.log("ReviewShield: Starting auto-fill...");
+        
         /* 1. Country / Wohnsitz */
-        await findAndFill(["material-select[aria-label*='Land']", "material-select[aria-label*='Wohnsitz']", "[name='country_of_residence']"], "Deutschland", "select");
+        await findAndFill(["div[role='listbox'][aria-label*='Land']", "material-select[aria-label*='Land']", "material-select[aria-label*='Wohnsitz']"], "Deutschland", "select");
         await sleep(500);
 
         /* 2. Full Name */
-        await findAndFill(["input[aria-label*='Vollständiger Name']", "input[name='full_name']", "input[placeholder*='Name']"], "Süleyman Furkan Kocak");
+        await findAndFill(["input[aria-label*='Vollständiger Name']", "input[jsname='YPqjbf'][aria-label*='Name']", "input[name='full_name']"], "Süleyman Furkan Kocak");
 
         /* 3. Acting on behalf of myself */
-        const radios = Array.from(document.querySelectorAll('material-radio, [role="radio"]'));
-        const myself = radios.find(r => r.textContent.includes('meinem eigenen Namen') || r.textContent.includes('myself') || r.textContent.includes('In my own name'));
-        if (myself) myself.click();
+        const radios = Array.from(document.querySelectorAll('material-radio, [role="radio"], div[role="radio"]'));
+        const myself = radios.find(r => r.textContent.includes('meinem eigenen Namen') || r.textContent.includes('myself') || r.textContent.includes('In my own name') || r.getAttribute('aria-label')?.includes('eigenen Namen'));
+        if (myself) {
+          myself.click();
+          console.log("ReviewShield: Clicked 'Own Behalf'");
+        }
 
         /* 4. URLs and Reasons */
         const urls = ${JSON.stringify(urls)};
         const reasonText = "Diese Bewertung ist rechtswidrig, da sie unwahre Tatsachenbehauptungen und Schmähkritik enthält, die gegen die Google-Richtlinien und geltendes Recht verstoßen. Es gab keinen geschäftlichen Kontakt zwischen dem Verfasser und unserem Mandanten. Wir fordern die Löschung.";
         
         /* Find all URL inputs and textareas */
-        const urlInputs = Array.from(document.querySelectorAll('input[aria-label*="URL"], [name^="url_"], .url-input input'));
-        const reasonInputs = Array.from(document.querySelectorAll('textarea[aria-label*="Begründen Sie"], [name^="reason_"], .reason-input textarea'));
+        const urlInputs = Array.from(document.querySelectorAll('input[aria-label*="URL des Inhalts"], textarea[aria-label*="URL des Inhalts"], [name^="url_"]'));
+        const reasonInputs = Array.from(document.querySelectorAll('textarea[aria-label*="Begründen Sie"], [name^="reason_"]'));
         
         console.log("ReviewShield: Found " + urlInputs.length + " URL fields");
 
@@ -86,22 +88,28 @@ export function BookmarkletGenerator({ reviews }: { reviews: any[] }) {
         }
         
         /* 5. Confirmation Checkbox */
-        await sleep(500);
-        const checkboxes = Array.from(document.querySelectorAll("material-checkbox, [role='checkbox']"));
-        const confirmBox = checkboxes.find(c => c.textContent.includes('Bestätigung') || c.getAttribute('aria-label')?.includes('confirm'));
-        if(confirmBox && !confirmBox.classList.contains('checked') && !confirmBox.getAttribute('aria-checked') === 'true') {
-          confirmBox.click();
+        await sleep(1000);
+        const checkboxes = Array.from(document.querySelectorAll("material-checkbox, [role='checkbox'], div[role='checkbox']"));
+        const confirmBox = checkboxes.find(c => c.textContent.includes('Bestätigung') || c.getAttribute('aria-label')?.includes('Bestätigung') || c.getAttribute('aria-label')?.includes('confirm'));
+        if(confirmBox) {
+          const isChecked = confirmBox.classList.contains('checked') || confirmBox.getAttribute('aria-checked') === 'true';
+          if (!isChecked) {
+            confirmBox.click();
+            console.log("ReviewShield: Checked confirmation box");
+          }
         }
 
         /* 6. Signature */
-        await findAndFill(["input[aria-label*='Unterschrift']", "input[name='signature']", "input[placeholder*='Unterschrift']"], "Süleyman Furkan Kocak");
+        await findAndFill(["input[aria-label*='Unterschrift']", "input[name='signature']", "input[jsname='YPqjbf'][aria-label*='Unterschrift']"], "Süleyman Furkan Kocak");
         
         alert("ReviewShield: Fertig! Bitte prüfen Sie das Land und lösen Sie das Captcha.");
       })();
     } catch(e) {
+      console.error(e);
       alert("ReviewShield Fehler: " + e.message);
     }
   })();`;
+
 
   // Provide a cleaner encoded version
   const encodedBookmarklet = encodeURI(bookmarkletCode);

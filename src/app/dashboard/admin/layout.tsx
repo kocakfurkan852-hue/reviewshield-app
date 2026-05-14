@@ -12,10 +12,10 @@ export default async function AdminLayout({
   const session = await getServerSession(authOptions);
   
   return (
-    <div className="flex h-screen bg-background overflow-hidden selection:bg-primary/30">
+    <div className="flex h-screen bg-transparent overflow-hidden selection:bg-primary/30">
       <StarsBackground />
       <Sidebar userEmail={session?.user?.email} userRole={session?.user?.role} />
-      <main className="flex-1 overflow-auto relative">
+      <main className="flex-1 overflow-auto relative bg-background/50 backdrop-blur-3xl">
         {children}
       </main>
     </div>
