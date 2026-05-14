@@ -1,6 +1,7 @@
 import { getUsers } from "@/app/actions/user";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { UserEditModal } from "@/components/user-edit-modal";
 import {
   Table,
   TableBody,
@@ -28,35 +29,54 @@ export default async function UsersPage() {
       <div className="vault-card rounded-md">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Added On</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                  No users found.
-                </TableCell>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Rights</TableHead>
+                <TableHead>Added On</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ) : (
-              users.map((user: any) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium text-foreground">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${user.role === 'ADMIN' ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                      {user.role}
-                    </span>
+            </TableHeader>
+            <TableBody>
+              {users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    No users found.
                   </TableCell>
-                  <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
+              ) : (
+                users.map((user: any) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium text-foreground">{user.name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${user.role === 'ADMIN' ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                        {user.role}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1 max-w-[200px]">
+                        {user.permissions?.slice(0, 2).map((p: string) => (
+                          <span key={p} className="text-[10px] bg-card border border-border px-1.5 py-0.5 rounded text-muted-foreground">
+                            {p.replace('_', ' ')}
+                          </span>
+                        ))}
+                        {user.permissions?.length > 2 && (
+                          <span className="text-[10px] text-muted-foreground font-medium">
+                            +{user.permissions.length - 2} more
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right">
+                      <UserEditModal user={user} />
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
         </Table>
       </div>
     </div>

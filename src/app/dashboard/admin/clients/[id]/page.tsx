@@ -2,6 +2,7 @@ import { getClientById } from "@/app/actions/client";
 import { getClientCampaigns } from "@/app/actions/campaign";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { DeleteCampaignButton } from "@/components/delete-campaign-button";
 import {
   Table,
   TableBody,
@@ -50,7 +51,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
             <TableHeader>
               <TableRow>
                 <TableHead>Campaign Name</TableHead>
-                <TableHead>Assigned Agent</TableHead>
+                <TableHead>Assigned People</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Reviews Tracked</TableHead>
                 <TableHead>Removal Requests</TableHead>
@@ -68,7 +69,16 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
                 campaigns.map((campaign) => (
                   <TableRow key={campaign.id}>
                     <TableCell className="font-medium text-foreground">{campaign.name}</TableCell>
-                    <TableCell>{campaign.assigned_agent.name}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {campaign.assignments.map((a: any) => (
+                          <span key={a.user.id} className="text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground">
+                            {a.user.name}
+                          </span>
+                        ))}
+                        {campaign.assignments.length === 0 && <span className="text-xs text-muted-foreground italic">None</span>}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <span className="px-2 py-1 rounded-full bg-primary/20 text-primary text-xs font-semibold">
                         {campaign.status}
@@ -78,8 +88,9 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
                     <TableCell>{campaign._count.removal_requests}</TableCell>
                     <TableCell className="text-right">
                       <Link href={`/dashboard/admin/campaigns/${campaign.id}`}>
-                        <Button variant="outline" size="sm" className="border-border text-foreground">Manage</Button>
+                        <Button variant="outline" size="sm" className="mr-2 border-border text-foreground">Manage</Button>
                       </Link>
+                      <DeleteCampaignButton id={campaign.id} name={campaign.name} />
                     </TableCell>
                   </TableRow>
                 ))

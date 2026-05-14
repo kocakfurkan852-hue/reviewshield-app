@@ -59,3 +59,15 @@ export async function getClientById(id: string) {
   if (!client) throw new Error("Client not found");
   return JSON.parse(JSON.stringify(client));
 }
+
+export async function deleteClient(id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "ADMIN") throw new Error("Unauthorized");
+
+  await prisma.client.delete({
+    where: { id }
+  });
+
+  revalidatePath("/dashboard/admin/clients");
+  return { success: true };
+}

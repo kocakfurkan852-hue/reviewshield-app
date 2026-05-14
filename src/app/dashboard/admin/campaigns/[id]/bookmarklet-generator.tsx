@@ -17,9 +17,9 @@ export function BookmarkletGenerator({ reviews }: { reviews: any[] }) {
   // The JS code that will be injected into the bookmarklet
   const bookmarkletCode = `javascript:(function(){
     try {
-      console.log("ReviewShield: Starting auto-fill...");
+      const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
       
-      const findAndFill = (selectors, value, type = "input") => {
+      const findAndFill = async (selectors, value, type = "input") => {
         for (const selector of selectors) {
           const el = document.querySelector(selector);
           if (el) {
@@ -31,13 +31,19 @@ export function BookmarkletGenerator({ reviews }: { reviews: any[] }) {
             } else if (type === "click") {
               el.click();
             } else if (type === "select") {
-              // Material selects are tricky, often need a click then finding the option
               el.click();
-              setTimeout(() => {
-                const option = Array.from(document.querySelectorAll('material-select-item, [role="option"]'))
-                  .find(opt => opt.textContent.includes(value));
-                if (option) option.click();
-              }, 500);
+              await sleep(800);
+              const options = Array.from(document.querySelectorAll('material-select-item, [role="option"], .material-select-dropdown material-select-item'));
+              const option = options.find(opt => opt.textContent.trim().toLowerCase().includes(value.toLowerCase()));
+              if (option) {
+                option.click();
+                console.log("ReviewShield: Selected " + value);
+              } else {
+                console.log("ReviewShield: Could not find option " + value);
+                /* Try a backup: sometimes the value is in an attribute */
+                const backup = options.find(opt => opt.getAttribute('value') === 'DE' || opt.getAttribute('data-value') === 'DE');
+                if (backup) backup.click();
+              }
             }
             return true;
           }
@@ -45,42 +51,55 @@ export function BookmarkletGenerator({ reviews }: { reviews: any[] }) {
         return false;
       };
 
-      /* 1. Country / Wohnsitz */
-      findAndFill(["material-select[aria-label='Land Ihres Wohnsitzes']", "[name='country_of_residence']", "material-select[aria-label*='Land']"], "Deutschland", "select");
+      (async () => {
+        /* 1. Country / Wohnsitz */
+        await findAndFill(["material-select[aria-label*='Land']", "material-select[aria-label*='Wohnsitz']", "[name='country_of_residence']"], "Deutschland", "select");
+        await sleep(500);
 
-      /* 2. Full Name */
-      findAndFill(["input[aria-label='Vollständiger Name']", "[name='full_name']", "input[aria-label*='Name']"], "Süleyman Furkan Kocak");
+        /* 2. Full Name */
+        await findAndFill(["input[aria-label*='Vollständiger Name']", "input[name='full_name']", "input[placeholder*='Name']"], "Süleyman Furkan Kocak");
 
-      /* 3. Acting on behalf of myself */
-      const myself = Array.from(document.querySelectorAll('material-radio')).find(r => r.textContent.includes('meinem eigenen Namen') || r.textContent.includes('myself'));
-      if (myself) myself.click();
+        /* 3. Acting on behalf of myself */
+        const radios = Array.from(document.querySelectorAll('material-radio, [role="radio"]'));
+        const myself = radios.find(r => r.textContent.includes('meinem eigenen Namen') || r.textContent.includes('myself') || r.textContent.includes('In my own name'));
+        if (myself) myself.click();
 
-      /* 4. URLs and Reasons */
-      const urls = ${JSON.stringify(urls)};
-      const reasonText = "Sehr geehrte Damen und Herren,\\n\\ndiese Bewertung verstößt gegen die Richtlinien (unwahre Tatsachenbehauptung/Schmähkritik) und stellt eine Rechtsverletzung dar. Wir bitten um umgehende Löschung.\\n\\nMit freundlichen Grüßen,\\nSüleyman Furkan Kocak";
-      
-      const urlInputs = document.querySelectorAll('input[aria-label*="URL"], [name^="url_"]');
-      const reasonInputs = document.querySelectorAll('textarea[aria-label*="Begründen Sie"], [name^="reason_"]');
-      
-      for(let i=0; i<Math.min(urls.length, urlInputs.length); i++) {
-        urlInputs[i].value = urls[i];
-        urlInputs[i].dispatchEvent(new Event("input", { bubbles: true }));
-        if(reasonInputs[i]) {
-          reasonInputs[i].value = reasonText;
-          reasonInputs[i].dispatchEvent(new Event("input", { bubbles: true }));
+        /* 4. URLs and Reasons */
+        const urls = ${JSON.stringify(urls)};
+        const reasonText = "Diese Bewertung ist rechtswidrig, da sie unwahre Tatsachenbehauptungen und Schmähkritik enthält, die gegen die Google-Richtlinien und geltendes Recht verstoßen. Es gab keinen geschäftlichen Kontakt zwischen dem Verfasser und unserem Mandanten. Wir fordern die Löschung.";
+        
+        /* Find all URL inputs and textareas */
+        const urlInputs = Array.from(document.querySelectorAll('input[aria-label*="URL"], [name^="url_"], .url-input input'));
+        const reasonInputs = Array.from(document.querySelectorAll('textarea[aria-label*="Begründen Sie"], [name^="reason_"], .reason-input textarea'));
+        
+        console.log("ReviewShield: Found " + urlInputs.length + " URL fields");
+
+        for(let i=0; i<Math.min(urls.length, urlInputs.length); i++) {
+          urlInputs[i].value = urls[i];
+          urlInputs[i].dispatchEvent(new Event("input", { bubbles: true }));
+          urlInputs[i].dispatchEvent(new Event("change", { bubbles: true }));
+          if(reasonInputs[i]) {
+            reasonInputs[i].value = reasonText;
+            reasonInputs[i].dispatchEvent(new Event("input", { bubbles: true }));
+            reasonInputs[i].dispatchEvent(new Event("change", { bubbles: true }));
+          }
         }
-      }
-      
-      /* 5. Confirmation Checkbox */
-      const checkbox = document.querySelector("material-checkbox[aria-label*='Zur Bestätigung aktivieren'], material-checkbox[aria-label*='confirm']");
-      if(checkbox && !checkbox.classList.contains('checked')) checkbox.click();
+        
+        /* 5. Confirmation Checkbox */
+        await sleep(500);
+        const checkboxes = Array.from(document.querySelectorAll("material-checkbox, [role='checkbox']"));
+        const confirmBox = checkboxes.find(c => c.textContent.includes('Bestätigung') || c.getAttribute('aria-label')?.includes('confirm'));
+        if(confirmBox && !confirmBox.classList.contains('checked') && !confirmBox.getAttribute('aria-checked') === 'true') {
+          confirmBox.click();
+        }
 
-      /* 6. Signature */
-      findAndFill(["input[aria-label='Unterschrift']", "[name='signature']", "input[aria-label*='Unterschrift']"], "Süleyman Furkan Kocak");
-      
-      alert("ReviewShield: Form auto-filled with " + urls.length + " reviews! Please check the country field, complete the Captcha and submit.");
+        /* 6. Signature */
+        await findAndFill(["input[aria-label*='Unterschrift']", "input[name='signature']", "input[placeholder*='Unterschrift']"], "Süleyman Furkan Kocak");
+        
+        alert("ReviewShield: Fertig! Bitte prüfen Sie das Land und lösen Sie das Captcha.");
+      })();
     } catch(e) {
-      alert("ReviewShield Bookmarklet Error: " + e.message);
+      alert("ReviewShield Fehler: " + e.message);
     }
   })();`;
 

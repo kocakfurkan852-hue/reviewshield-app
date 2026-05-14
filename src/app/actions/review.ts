@@ -44,7 +44,13 @@ export async function getCampaignById(id: string) {
     where: { id },
     include: {
       client: true,
-      assigned_agent: true,
+      assignments: {
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, role: true }
+          }
+        }
+      },
       reviews: {
         orderBy: { created_at: 'desc' }
       }

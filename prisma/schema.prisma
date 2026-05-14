@@ -16,12 +16,13 @@ model User {
   updated_at       DateTime         @updatedAt
   deleted_at       DateTime?
   audit_logs       AuditLog[]       @relation("UserAuditLogs")
-  assigned_camps   Campaign[]       @relation("AssignedAgent")
   clients          Client[]
   reviewed_drafts  OutboundDraft[]  @relation("ReviewedBy")
   submitted_reqs   RemovalRequest[] @relation("SubmittedBy")
   generated_reps   Report[]         @relation("GeneratedBy")
   settings_updated SystemSetting[]  @relation("UpdatedBy")
+  permissions      String[]         @default(["view_dashboard", "manage_reviews"])
+  assignments      CampaignAssignment[]
 }
 
 model Client {
@@ -47,13 +48,12 @@ model Campaign {
   client_id         String           @db.Uuid
   name              String
   status            CampaignStatus   @default(ACTIVE)
-  assigned_agent_id String           @db.Uuid
   created_at        DateTime         @default(now())
   updated_at        DateTime         @updatedAt
   completed_at      DateTime?
   deleted_at        DateTime?
-  assigned_agent    User             @relation("AssignedAgent", fields: [assigned_agent_id], references: [id])
-  client            Client           @relation(fields: [client_id], references: [id])
+  assignments       CampaignAssignment[]
+  client            Client           @relation(fields: [client_id], references: [id], onDelete: Cascade)
   email_threads     EmailThread[]
   outbound_drafts   OutboundDraft[]
   removal_requests  RemovalRequest[]
@@ -76,7 +76,7 @@ model Review {
   updated_at              DateTime               @updatedAt
   deleted_at              DateTime?
   removal_request_reviews RemovalRequestReview[]
-  campaign                Campaign               @relation(fields: [campaign_id], references: [id])
+  campaign                Campaign               @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
 
   @@unique([campaign_id, review_url])
 }
@@ -93,7 +93,7 @@ model RemovalRequest {
   updated_at              DateTime               @updatedAt
   outbound_drafts         OutboundDraft[]
   reminder_schedules      ReminderSchedule[]
-  campaign                Campaign               @relation(fields: [campaign_id], references: [id])
+  campaign                Campaign               @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
   submitted_by            User                   @relation("SubmittedBy", fields: [submitted_by_user_id], references: [id])
   removal_request_reviews RemovalRequestReview[]
 }
@@ -101,8 +101,8 @@ model RemovalRequest {
 model RemovalRequestReview {
   removal_request_id String         @db.Uuid
   review_id          String         @db.Uuid
-  removal_request    RemovalRequest @relation(fields: [removal_request_id], references: [id])
-  review             Review         @relation(fields: [review_id], references: [id])
+  removal_request    RemovalRequest @relation(fields: [removal_request_id], references: [id], onDelete: Cascade)
+  review             Review         @relation(fields: [review_id], references: [id], onDelete: Cascade)
 
   @@id([removal_request_id, review_id])
 }
@@ -123,7 +123,7 @@ model EmailThread {
   processed            Boolean         @default(false)
   created_at           DateTime        @default(now())
   updated_at           DateTime        @updatedAt
-  campaign             Campaign        @relation(fields: [campaign_id], references: [id])
+  campaign             Campaign        @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
   outbound_drafts      OutboundDraft[]
 }
 
@@ -159,9 +159,9 @@ model OutboundDraft {
   admin_note           String?
   created_at           DateTime          @default(now())
   updated_at           DateTime          @updatedAt
-  campaign             Campaign          @relation(fields: [campaign_id], references: [id])
-  email_thread         EmailThread?      @relation(fields: [email_thread_id], references: [id])
-  removal_request      RemovalRequest?   @relation(fields: [removal_request_id], references: [id])
+  campaign             Campaign          @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  email_thread         EmailThread?      @relation(fields: [email_thread_id], references: [id], onDelete: Cascade)
+  removal_request      RemovalRequest?   @relation(fields: [removal_request_id], references: [id], onDelete: Cascade)
   reviewed_by          User?             @relation("ReviewedBy", fields: [reviewed_by_user_id], references: [id])
   selected_template    ResponseTemplate? @relation(fields: [selected_template_id], references: [id])
 }
@@ -178,7 +178,7 @@ model ReminderSchedule {
   stale                  Boolean        @default(false)
   created_at             DateTime       @default(now())
   updated_at             DateTime       @updatedAt
-  removal_request        RemovalRequest @relation(fields: [removal_request_id], references: [id])
+  removal_request        RemovalRequest @relation(fields: [removal_request_id], references: [id], onDelete: Cascade)
 }
 
 model Report {
@@ -192,7 +192,7 @@ model Report {
   delivery_method      DeliveryMethod?
   created_at           DateTime        @default(now())
   updated_at           DateTime        @updatedAt
-  campaign             Campaign        @relation(fields: [campaign_id], references: [id])
+  campaign             Campaign        @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
   generated_by         User            @relation("GeneratedBy", fields: [generated_by_user_id], references: [id])
 }
 
@@ -205,6 +205,16 @@ model AuditLog {
   metadata    String?
   created_at  DateTime @default(now())
   user        User?    @relation("UserAuditLogs", fields: [user_id], references: [id])
+}
+
+model CampaignAssignment {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String   @db.Uuid
+  campaign_id String   @db.Uuid
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  campaign    Campaign @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, campaign_id])
 }
 
 model SystemSetting {

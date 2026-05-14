@@ -25,17 +25,24 @@ export function CampaignForm({ clientId, agents }: { clientId: string, agents: A
     setError("");
 
     const formData = new FormData(e.currentTarget);
+    const agentIds = Array.from(formData.getAll("agent_ids")) as string[];
+    
+    if (agentIds.length === 0) {
+      setError("Please assign at least one agent.");
+      setLoading(false);
+      return;
+    }
+
     const data = {
       client_id: clientId,
       name: formData.get("name") as string,
-      assigned_agent_id: formData.get("assigned_agent_id") as string,
+      agent_ids: agentIds,
     };
 
     try {
       await createCampaign(data);
       router.push(`/dashboard/admin/clients/${clientId}`);
     } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setError((err as any).message || "An error occurred");
       setLoading(false);
     }
@@ -43,7 +50,7 @@ export function CampaignForm({ clientId, agents }: { clientId: string, agents: A
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
-      {error && <div className="text-destructive font-medium">{error}</div>}
+      {error && <div className="text-destructive font-medium bg-destructive/10 p-3 rounded">{error}</div>}
       
       <div className="space-y-4">
         <div className="space-y-2">
@@ -52,21 +59,24 @@ export function CampaignForm({ clientId, agents }: { clientId: string, agents: A
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="assigned_agent_id">Assign Agent *</Label>
-          <select 
-            id="assigned_agent_id" 
-            name="assigned_agent_id" 
-            required 
-            defaultValue=""
-            className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground"
-          >
-            <option value="" disabled>Select an agent...</option>
+          <Label className="block mb-2">Assign Agents *</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 border border-border rounded-md bg-card/30">
             {agents.map(agent => (
-              <option key={agent.id} value={agent.id}>
-                {agent.name} ({agent.role})
-              </option>
+              <label key={agent.id} className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-white/5 rounded-md transition-colors">
+                <input 
+                  type="checkbox" 
+                  name="agent_ids" 
+                  value={agent.id}
+                  className="w-4 h-4 rounded border-border bg-background accent-primary"
+                />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-foreground">{agent.name}</span>
+                  <span className="text-[10px] text-muted-foreground uppercase">{agent.role}</span>
+                </div>
+              </label>
             ))}
-          </select>
+          </div>
+          <p className="text-[10px] text-muted-foreground italic mt-1">Select one or more people to manage this campaign.</p>
         </div>
       </div>
 

@@ -11,7 +11,11 @@ export default async function AgentDashboard() {
 
   const assignedCampaigns = await prisma.campaign.findMany({
     where: { 
-      assigned_agent_id: session.user.id,
+      assignments: {
+        some: {
+          user_id: session.user.id
+        }
+      },
       status: 'ACTIVE'
     },
     include: {

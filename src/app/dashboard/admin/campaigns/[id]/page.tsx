@@ -25,9 +25,15 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
               </Button>
             </Link>
             <h1 className="text-3xl font-heading font-bold text-foreground">{campaign.name}</h1>
-            <p className="text-muted-foreground mt-1">
-              Assigned to: <span className="text-foreground font-medium">{campaign.assigned_agent.name}</span>
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <span className="text-sm text-muted-foreground">Assigned to:</span>
+              {campaign.assignments.map((a: any) => (
+                <span key={a.user.id} className="text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground font-medium">
+                  {a.user.name}
+                </span>
+              ))}
+              {campaign.assignments.length === 0 && <span className="text-xs text-muted-foreground italic">No one assigned</span>}
+            </div>
           </div>
           <div className="text-right">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/20 text-primary text-sm font-semibold mb-2">

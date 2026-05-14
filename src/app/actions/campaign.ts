@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-export async function createCampaign(data: { client_id: string, name: string, assigned_agent_id: string }) {
+export async function createCampaign(data: { client_id: string, name: string, agent_ids: string[] }) {
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== "ADMIN") {
@@ -16,13 +16,29 @@ export async function createCampaign(data: { client_id: string, name: string, as
     data: {
       client_id: data.client_id,
       name: data.name,
-      assigned_agent_id: data.assigned_agent_id,
+      assignments: {
+        create: data.agent_ids.map(id => ({ user_id: id }))
+      }
     }
   });
   
   revalidatePath(`/dashboard/admin/clients/${data.client_id}`);
   revalidatePath("/dashboard/admin/clients");
   return { success: true, id: campaign.id };
+}
+
+export async function deleteCampaign(id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "ADMIN") throw new Error("Unauthorized");
+
+  const campaign = await prisma.campaign.findUnique({ where: { id } });
+  if (!campaign) throw new Error("Campaign not found");
+
+  await prisma.campaign.delete({ where: { id } });
+
+  revalidatePath(`/dashboard/admin/clients/${campaign.client_id}`);
+  revalidatePath("/dashboard/admin/clients");
+  return { success: true };
 }
 
 export async function getClientCampaigns(client_id: string) {
@@ -32,8 +48,12 @@ export async function getClientCampaigns(client_id: string) {
   const campaigns = await prisma.campaign.findMany({
     where: { client_id },
     include: {
-      assigned_agent: {
-        select: { id: true, name: true, email: true }
+      assignments: {
+        include: {
+          user: {
+            select: { id: true, name: true, email: true }
+          }
+        }
       },
       _count: {
         select: { reviews: true, removal_requests: true }
@@ -49,7 +69,6 @@ export async function getAgents() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "ADMIN") throw new Error("Unauthorized");
 
-  // Get all users so admin can assign themselves or agents
   const agents = await prisma.user.findMany({
     select: { id: true, name: true, email: true, role: true },
     orderBy: { name: 'asc' }

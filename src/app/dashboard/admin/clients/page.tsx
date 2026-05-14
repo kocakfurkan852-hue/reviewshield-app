@@ -1,6 +1,7 @@
 import { getClients } from "@/app/actions/client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { DeleteClientButton } from "@/components/delete-client-button";
 import {
   Table,
   TableBody,
@@ -56,6 +57,7 @@ export default async function ClientsPage() {
                     <Link href={`/dashboard/admin/clients/${client.id}`}>
                       <Button variant="outline" size="sm" className="mr-2 border-border text-foreground">View</Button>
                     </Link>
+                    <DeleteClientButton id={client.id} name={client.company_name} />
                   </TableCell>
                 </TableRow>
               ))
