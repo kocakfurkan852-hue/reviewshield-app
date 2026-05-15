@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 
 export function Sidebar({ 
@@ -17,6 +17,14 @@ export function Sidebar({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const session = useSession();
+  const sessionData = session?.data;
+  const status = session?.status;
+  
+  if (status === "loading") {
+    return <div className="w-64 bg-card border-r border-border" />;
+  }
+  
   const isAdmin = userRole === "ADMIN";
 
   const adminLinks = [
@@ -85,11 +93,13 @@ export function Sidebar({
         <div className={`p-4 border-t border-border/50 mt-auto flex flex-col gap-4 ${collapsed ? 'items-center px-2' : ''}`}>
           <div className="flex justify-between items-center w-full">
             {!collapsed && (
-              <div className="overflow-hidden">
-                <p className="text-xs font-medium truncate text-foreground/80">{userEmail}</p>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <div className={`w-1.5 h-1.5 rounded-full ${isAdmin ? 'bg-emerald-500' : 'bg-primary shadow-[0_0_8px_rgba(var(--primary),0.5)]'}`} />
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase">{userRole}</p>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
+                  {sessionData?.user?.name?.[0] || userEmail?.[0] || "U"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{sessionData?.user?.name || "User"}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{sessionData?.user?.email || userEmail}</p>
                 </div>
               </div>
             )}
