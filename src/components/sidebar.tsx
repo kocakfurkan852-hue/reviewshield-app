@@ -98,8 +98,7 @@ export function Sidebar({
           
           <button 
             onClick={async () => {
-              await signOut({ redirect: false, callbackUrl: '/login' });
-              window.location.href = '/login';
+              await signOut({ callbackUrl: '/login' });
             }}
             className={`flex items-center gap-3 w-full py-2.5 rounded-lg text-sm font-medium transition-all group ${
               collapsed ? 'justify-center text-destructive hover:bg-destructive/10' : 'px-4 bg-destructive/10 text-destructive hover:bg-destructive hover:text-white'

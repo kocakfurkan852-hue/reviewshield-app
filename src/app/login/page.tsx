@@ -20,19 +20,18 @@ export default function LoginPage() {
       password,
     });
     
-    if (res?.error) {
-      setError("Invalid email or password");
-    } else {
-      // Fetch session to get the role
-      const sessionRes = await fetch("/api/auth/session");
-      const session = await sessionRes.json();
-      
-      if (session?.user?.role === "ADMIN") {
-        router.push("/dashboard/admin");
-      } else {
-        router.push("/dashboard/agent");
+    try {
+      if (res?.error) {
+        setError("Invalid email or password");
+        return;
       }
+
+      // Refresh and redirect - middleware will handle the role-based routing
       router.refresh();
+      router.push("/dashboard"); 
+    } catch (err) {
+      console.error("Login crash caught:", err);
+      setError("A client-side error occurred. Please try again.");
     }
   };
 

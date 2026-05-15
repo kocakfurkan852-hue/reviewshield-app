@@ -1,7 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Sidebar } from "@/components/sidebar";
-import { StarsBackground } from "@/components/stars-background";
 import { redirect } from "next/navigation";
 
 export default async function AgentLayout({
@@ -17,7 +16,6 @@ export default async function AgentLayout({
 
   return (
     <div className="flex h-screen bg-transparent overflow-hidden selection:bg-primary/30">
-      <StarsBackground />
       <Sidebar 
         userEmail={session?.user?.email} 
         userRole={session?.user?.role} 

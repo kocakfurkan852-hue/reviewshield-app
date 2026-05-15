@@ -2,7 +2,6 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Sidebar } from "@/components/sidebar";
-import { StarsBackground } from "@/components/stars-background";
 
 export default async function AdminLayout({
   children,
@@ -13,7 +12,6 @@ export default async function AdminLayout({
   
   return (
     <div className="flex h-screen bg-transparent overflow-hidden selection:bg-primary/30">
-      <StarsBackground />
       <Sidebar 
         userEmail={session?.user?.email} 
         userRole={session?.user?.role} 

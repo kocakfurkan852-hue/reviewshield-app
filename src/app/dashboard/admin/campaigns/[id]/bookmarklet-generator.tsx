@@ -7,7 +7,7 @@ export function BookmarkletGenerator({ reviews }: { reviews: any[] }) {
   const [show, setShow] = useState(false);
 
   // Get up to 10 pending reviews
-  const pendingReviews = reviews.filter(r => r.status === "PENDING" || r.status === "SUBMITTED").slice(0, 10);
+  const pendingReviews = (reviews || []).filter(r => r.status === "PENDING" || r.status === "SUBMITTED").slice(0, 10);
 
   if (pendingReviews.length === 0) return null;
 

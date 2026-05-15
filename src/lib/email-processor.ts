@@ -13,6 +13,20 @@ export async function processEmail({
   messageId: string;
   threadId: string;
 }) {
+  // Check for existing message to avoid duplicates
+  const existing = await prisma.emailThread.findFirst({
+    where: { gmail_message_id: messageId }
+  });
+
+  if (existing) {
+    return { 
+      success: true, 
+      already_processed: true, 
+      emailThreadId: existing.id,
+      campaignId: existing.campaign_id 
+    };
+  }
+
   // We need to associate this email with a campaign.
   // Extract ticket ID from subject e.g., [Ticket ID: 1-12345]
   const ticketMatch = subject?.match(/\[Ticket ID: ([^\]]+)\]/);
