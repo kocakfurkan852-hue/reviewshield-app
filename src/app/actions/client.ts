@@ -71,3 +71,27 @@ export async function deleteClient(id: string) {
   revalidatePath("/dashboard/admin/clients");
   return { success: true };
 }
+
+export async function getClientsWithCampaigns() {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "ADMIN") throw new Error("Unauthorized");
+
+  const data = await prisma.client.findMany({
+    where: { deleted_at: null },
+    include: {
+      campaigns: {
+        where: { status: 'ACTIVE' },
+        include: {
+          reviews: {
+            where: { deleted_at: null },
+            select: { id: true, reviewer_name: true, star_rating: true }
+          }
+        }
+      }
+    },
+    orderBy: { company_name: 'asc' }
+  });
+
+  return JSON.parse(JSON.stringify(data));
+}
+

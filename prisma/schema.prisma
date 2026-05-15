@@ -110,7 +110,7 @@ model RemovalRequestReview {
 
 model EmailThread {
   id                   String          @id @default(uuid()) @db.Uuid
-  campaign_id          String          @db.Uuid
+  campaign_id          String?         @db.Uuid
   gmail_thread_id      String
   gmail_message_id     String
   subject              String
@@ -124,7 +124,7 @@ model EmailThread {
   processed            Boolean         @default(false)
   created_at           DateTime        @default(now())
   updated_at           DateTime        @updatedAt
-  campaign             Campaign        @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  campaign             Campaign?       @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
   outbound_drafts      OutboundDraft[]
 }
 

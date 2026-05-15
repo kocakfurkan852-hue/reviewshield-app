@@ -117,119 +117,116 @@ export async function processEmail({
     }
   }
 
-  // 2d: No match → reject (never dump into random campaign)
-  if (!campaignId) {
-    return { success: false, reason: "No campaign or tracking ref associated with this email." };
+  // ── Step 2d: No match → Allow Orphan (Never reject, store for manual assignment)
+  // Removed rejection block to allow orphaned emails.
+
+  // ── Step 3: AI Classification (powered by KnowledgeBase) ──
+  const aiAnalysis = await parseGoogleResponse(bodyData, subject || "");
+  const parsedAction = aiAnalysis.parsedAction as "APPROVED" | "REJECTED" | "NEEDS_INFO" | "UNKNOWN";
+  const responseCode = aiAnalysis.responseCode || "UNKNOWN";
+
+  // ── Step 4: Create EmailThread record (campaignId can be null) ──
+  const emailThread = await prisma.emailThread.create({
+    data: {
+      campaign_id: campaignId || null,
+      gmail_thread_id: threadId,
+      gmail_message_id: messageId,
+      subject: subject || "Unknown Subject",
+      received_at: new Date(),
+      direction: "INBOUND",
+      raw_body: bodyData,
+      ai_summary: aiAnalysis.summary,
+      ai_parsed_action: parsedAction,
+      ai_confidence: aiAnalysis.confidence,
+      google_response_type: responseCode,
+      processed: true
+    }
+  });
+
+  // ── Step 5: Update Review Status (Only if campaign matched) ──
+  if (campaignId && removalRequestId && parsedAction !== "UNKNOWN") {
+    const linkedReviews = await prisma.removalRequestReview.findMany({
+      where: { removal_request_id: removalRequestId },
+      select: { review_id: true }
+    });
+
+    const reviewIds = linkedReviews.map(lr => lr.review_id);
+
+    if (reviewIds.length > 0) {
+      const statusMap: Record<string, string> = {
+        "APPROVED": "APPROVED",
+        "REJECTED": "REJECTED",
+        "NEEDS_INFO": "NEEDS_INFO"
+      };
+
+      const newStatus = statusMap[parsedAction];
+      if (newStatus) {
+        await prisma.review.updateMany({
+          where: { id: { in: reviewIds } },
+          data: {
+            status: newStatus as any,
+            resolved_at: (parsedAction === "APPROVED" || parsedAction === "REJECTED") ? new Date() : undefined
+          }
+        });
+      }
+    }
+
+    // Disable reminders on SUCCESS
+    if (parsedAction === "APPROVED") {
+      await prisma.reminderSchedule.updateMany({
+        where: { removal_request_id: removalRequestId },
+        data: { stale: true, reminder_enabled: false }
+      });
+    }
   }
 
-  if (campaignId && threadId) {
-    // ── Step 3: AI Classification (powered by KnowledgeBase) ──
-    const aiAnalysis = await parseGoogleResponse(bodyData, subject || "");
-    const parsedAction = aiAnalysis.parsedAction as "APPROVED" | "REJECTED" | "NEEDS_INFO" | "UNKNOWN";
-    const responseCode = aiAnalysis.responseCode || "UNKNOWN";
-
-    // ── Step 4: Create EmailThread record ──
-    const emailThread = await prisma.emailThread.create({
-      data: {
-        campaign_id: campaignId,
-        gmail_thread_id: threadId,
-        gmail_message_id: messageId,
-        subject: subject || "Unknown Subject",
-        received_at: new Date(),
-        direction: "INBOUND",
-        raw_body: bodyData,
-        ai_summary: aiAnalysis.summary,
-        ai_parsed_action: parsedAction,
-        ai_confidence: aiAnalysis.confidence,
-        google_response_type: responseCode,
-        processed: true
+  // ── Step 6: Generate Draft Reply (Only if campaign matched) ──
+  if (campaignId && removalRequestId && parsedAction === "NEEDS_INFO" && responseCode !== "UNKNOWN") {
+    // Load campaign + client context for placeholder filling
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      include: {
+        client: true,
+        reviews: {
+          select: { review_url: true },
+          take: 10
+        }
       }
     });
 
-    // ── Step 5: Update Review Status ──
-    if (removalRequestId && parsedAction !== "UNKNOWN") {
-      const linkedReviews = await prisma.removalRequestReview.findMany({
-        where: { removal_request_id: removalRequestId },
-        select: { review_id: true }
-      });
+    try {
+      const companyName = campaign?.client.company_name || "Unknown";
+      const authorizedName = campaign?.client.deletion_name || campaign?.client.contact_name || "Unknown";
+      const reviewUrls = campaign?.reviews.map(r => r.review_url) || [];
 
-      const reviewIds = linkedReviews.map(lr => lr.review_id);
-
-      if (reviewIds.length > 0) {
-        const statusMap: Record<string, string> = {
-          "APPROVED": "APPROVED",
-          "REJECTED": "REJECTED",
-          "NEEDS_INFO": "NEEDS_INFO"
-        };
-
-        const newStatus = statusMap[parsedAction];
-        if (newStatus) {
-          await prisma.review.updateMany({
-            where: { id: { in: reviewIds } },
-            data: {
-              status: newStatus as any,
-              resolved_at: (parsedAction === "APPROVED" || parsedAction === "REJECTED") ? new Date() : undefined
-            }
-          });
+      const draftResult = await generateEmailResponse(
+        bodyData,
+        responseCode,
+        companyName,
+        googleTicketId || "Unknown",
+        {
+          authorizedName,
+          reviewUrls,
+          googlePlaceUrl: campaign?.client.google_maps_url || undefined,
         }
-      }
+      );
 
-      // Disable reminders on SUCCESS
-      if (parsedAction === "APPROVED") {
-        await prisma.reminderSchedule.updateMany({
-          where: { removal_request_id: removalRequestId },
-          data: { stale: true, reminder_enabled: false }
-        });
-      }
-    }
-
-    // ── Step 6: Generate Draft Reply (Template-Based) ──
-    if (removalRequestId && parsedAction === "NEEDS_INFO" && responseCode !== "UNKNOWN") {
-      // Load campaign + client context for placeholder filling
-      const campaign = await prisma.campaign.findUnique({
-        where: { id: campaignId },
-        include: {
-          client: true,
-          reviews: {
-            select: { review_url: true },
-            take: 10
-          }
+      await prisma.outboundDraft.create({
+        data: {
+          campaign_id: campaignId,
+          email_thread_id: emailThread.id,
+          removal_request_id: removalRequestId,
+          draft_type: "REPLY",
+          rendered_subject: draftResult.subject,
+          rendered_body: draftResult.body,
+          to_address: "removals@google.com",
+          status: "PENDING_REVIEW"
         }
       });
-
-      try {
-        const companyName = campaign?.client.company_name || "Unknown";
-        const authorizedName = campaign?.client.deletion_name || campaign?.client.contact_name || "Unknown";
-        const reviewUrls = campaign?.reviews.map(r => r.review_url) || [];
-
-        const draftResult = await generateEmailResponse(
-          bodyData,
-          responseCode,
-          companyName,
-          googleTicketId || "Unknown",
-          {
-            authorizedName,
-            reviewUrls,
-            googlePlaceUrl: campaign?.client.google_maps_url || undefined,
-          }
-        );
-
-        await prisma.outboundDraft.create({
-          data: {
-            campaign_id: campaignId,
-            email_thread_id: emailThread.id,
-            removal_request_id: removalRequestId,
-            draft_type: "REPLY",
-            rendered_subject: draftResult.subject,
-            rendered_body: draftResult.body,
-            to_address: "removals@google.com",
-            status: "PENDING_REVIEW"
-          }
-        });
-      } catch (draftError) {
-        console.warn(`Could not generate ${responseCode} draft:`, draftError);
-      }
+    } catch (draftError) {
+      console.warn(`Could not generate ${responseCode} draft:`, draftError);
     }
+  }
 
     // ── Step 7: Auto-Learn Unknown Patterns ──
     if (responseCode === "UNKNOWN" && aiAnalysis.confidence < 70) {
