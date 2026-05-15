@@ -1,6 +1,7 @@
 import { getKnowledgeEntries } from "@/app/actions/knowledge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { KnowledgeEditModal } from "@/components/knowledge-edit-modal";
 import {
   Table,
   TableBody,
@@ -64,7 +65,7 @@ export default async function KnowledgeBasePage() {
                     </TableCell>
                     <TableCell className="text-sm truncate max-w-xs">{entry.source}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" className="border-border text-foreground">Edit</Button>
+                      <KnowledgeEditModal entry={entry} />
                     </TableCell>
                   </TableRow>
                 ))

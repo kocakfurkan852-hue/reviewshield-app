@@ -2,41 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchUnreadEmails, markEmailAsRead } from "@/lib/gmail";
 import { processEmail } from "@/lib/email-processor";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
-export async function GET(req: Request) {
-  // Simple auth for cron job using same EXTERNAL_API_KEY
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.EXTERNAL_API_KEY}`) {
+export async function POST(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "ADMIN") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const settings = await prisma.systemSetting.findMany();
-    const getSetting = (k: string, defaultVal: string) => settings.find(s => s.setting_key === k)?.setting_value || defaultVal;
-    
-    if (getSetting('EMAIL_SCAN_ENABLED', 'true') === 'false') {
-        return NextResponse.json({ success: true, message: "Scanning disabled by admin." });
-    }
-
-    const frequency = getSetting('EMAIL_SCAN_FREQUENCY', 'HOURLY');
-    const lastScanTime = parseInt(getSetting('LAST_SCAN_TIME', '0'), 10);
-    const now = Date.now();
-    const timeDiff = now - lastScanTime;
-    
-    if (frequency === 'DAILY' && timeDiff < 86400000) {
-        return NextResponse.json({ success: true, message: "Skipping, daily threshold not met." });
-    } else if (frequency === 'WEEKLY' && timeDiff < 604800000) {
-        return NextResponse.json({ success: true, message: "Skipping, weekly threshold not met." });
-    }
-
-    await prisma.systemSetting.upsert({
-        where: { setting_key: 'LAST_SCAN_TIME' },
-        update: { setting_value: now.toString() },
-        create: { setting_key: 'LAST_SCAN_TIME', setting_value: now.toString() }
-    });
-
-    const customQuery = getSetting('EMAIL_SCAN_QUERY', 'is:unread from:removals@google.com');
-
+    const customQuery = 'is:unread from:removals@google.com';
     const unreadMessages = await fetchUnreadEmails(customQuery);
     
     if (unreadMessages.length === 0) {
@@ -55,7 +31,6 @@ export async function GET(req: Request) {
       const messageId = messageIdHeader?.value || msg.id || "unknown";
       const threadId = msg.threadId || "";
 
-      // Extremely simplified body extraction (for multipart emails, this requires parsing parts)
       let bodyData = "";
       if (payload?.parts) {
         const textPart = payload.parts.find((p) => p.mimeType === "text/plain");
@@ -89,7 +64,7 @@ export async function GET(req: Request) {
 
   } catch (error: unknown) {
     const err = error as Error;
-    console.error("Cron Job Error:", error);
+    console.error("Manual Sync Error:", error);
     return NextResponse.json({ error: err.message || "Internal Server Error" }, { status: 500 });
   }
 }

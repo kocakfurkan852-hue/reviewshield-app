@@ -15,28 +15,11 @@ export async function parseGoogleResponse(emailBody: string, subjectLine: string
     };
   }
 
-  const prompt = `
-    You are an expert at parsing automated responses from Google's business support team regarding review deletion requests.
-    Analyze the following email and determine the outcome.
-    
-    Email Subject: ${subjectLine}
-    Email Body:
-    ${emailBody}
-    
-    Categorize the response into one of the following exact statuses:
-    - APPROVED (Google agreed to delete the review)
-    - REJECTED (Google refused to delete the review)
-    - NEEDS_INFO (Google is asking for more information/evidence)
-    - UNKNOWN (The email doesn't clearly fit the above)
-    
-    Return a JSON object strictly matching this format:
-    {
-      "parsedAction": "APPROVED" | "REJECTED" | "NEEDS_INFO" | "UNKNOWN",
-      "confidence": <number between 0 and 100>,
-      "summary": "<a strict 1-2 sentence summary of what Google is saying>",
-      "googleResponseType": "<a short keyword like 'INITIAL_CONFIRMATION', 'REJECTION_NOTICE', etc.>"
-    }
-  `;
+  const prompt = `Classify this Google review removal response email.
+Subject: ${subjectLine.substring(0, 100)}
+Body: ${emailBody.substring(0, 1000)}
+Categories: APPROVED, REJECTED, NEEDS_INFO, UNKNOWN.
+Return strict JSON: {"parsedAction":"<category>","confidence":<0-100>,"summary":"<1 sentence>","googleResponseType":"<keyword>"}`;
 
   try {
     const msg = await anthropic.messages.create({

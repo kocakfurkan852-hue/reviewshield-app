@@ -43,3 +43,37 @@ export async function getKnowledgeEntries() {
     orderBy: { created_at: 'desc' }
   });
 }
+
+export async function updateKnowledgeEntry(id: string, data: {
+  title?: string;
+  category?: "LEGAL_TEMPLATE" | "DELETION_PROCESS" | "GOOGLE_TOS" | "CASE_LAW" | "CUSTOM";
+  content?: string;
+  source?: string;
+  tags?: string;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "ADMIN") throw new Error("Unauthorized");
+
+  const updateData: any = { ...data };
+  if (data.tags) {
+    updateData.tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
+  }
+
+  await prisma.knowledgeBase.update({
+    where: { id },
+    data: updateData
+  });
+
+  revalidatePath("/dashboard/admin/knowledge");
+  return { success: true };
+}
+
+export async function deleteKnowledgeEntry(id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "ADMIN") throw new Error("Unauthorized");
+
+  await prisma.knowledgeBase.delete({ where: { id } });
+
+  revalidatePath("/dashboard/admin/knowledge");
+  return { success: true };
+}

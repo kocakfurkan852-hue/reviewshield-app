@@ -1,6 +1,7 @@
 import { getTemplates } from "@/app/actions/template";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { TemplateEditModal } from "@/components/template-edit-modal";
 import {
   Table,
   TableBody,
@@ -63,7 +64,7 @@ export default async function TemplatesPage() {
                     </TableCell>
                     <TableCell>v{tpl.version}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" className="border-border text-foreground">Edit</Button>
+                      <TemplateEditModal template={tpl} />
                     </TableCell>
                   </TableRow>
                 ))

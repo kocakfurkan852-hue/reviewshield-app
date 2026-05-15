@@ -94,7 +94,23 @@ export async function processEmail({
     }
   }
 
-  // Fallback: Pick the first active campaign ONLY if we are absolutely desperate, 
+  // Fallback 1: Try matching business name in subject or body
+  if (!campaignId) {
+    const clients = await prisma.client.findMany({ select: { id: true, company_name: true }});
+    for (const client of clients) {
+      // Very basic text match (case insensitive)
+      const nameLower = client.company_name.toLowerCase();
+      if (subject.toLowerCase().includes(nameLower) || bodyData.toLowerCase().includes(nameLower)) {
+         const campaign = await prisma.campaign.findFirst({ where: { client_id: client.id, status: "ACTIVE" }});
+         if (campaign) {
+            campaignId = campaign.id;
+            break;
+         }
+      }
+    }
+  }
+
+  // Fallback 2: Pick the first active campaign ONLY if we are absolutely desperate, 
   // but this is dangerous, so we'll just return an error to avoid dumping unrelated emails into Client 1.
   if (!campaignId) {
     return { success: false, reason: "No campaign or tracking ref associated with this email." };

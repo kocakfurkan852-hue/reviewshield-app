@@ -1,6 +1,7 @@
 import { getAdminDashboardStats } from "@/app/actions/dashboard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { AdminQuickActions } from "@/components/admin-quick-actions";
 
 export default async function AdminDashboard() {
   const stats = await getAdminDashboardStats();
@@ -8,7 +9,10 @@ export default async function AdminDashboard() {
   return (
     <div className="p-8 bg-background min-h-screen">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-heading font-bold text-foreground mb-8">Admin Overview</h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-heading font-bold text-foreground">Admin Overview</h1>
+          <AdminQuickActions />
+        </div>
         
         {/* KPI Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
