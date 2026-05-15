@@ -122,7 +122,7 @@ export function UserEditModal({ user }: { user: any }) {
             <div className="space-y-2">
               <Label htmlFor="password">Reset Password (leave blank to keep current)</Label>
               <div className="relative">
-                <Input id="password" name="password" type="password" placeholder="New password..." className="bg-transparent pr-10" />
+                <Input id="password" name="password" type="password" autoComplete="new-password" placeholder="New password..." className="bg-transparent pr-10" />
                 <Key className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
               </div>
             </div>

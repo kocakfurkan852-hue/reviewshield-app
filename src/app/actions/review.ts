@@ -60,3 +60,29 @@ export async function getCampaignById(id: string) {
   if (!campaign) throw new Error("Campaign not found");
   return JSON.parse(JSON.stringify(campaign));
 }
+
+export async function deleteReviews(ids: string[], campaign_id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Unauthorized");
+
+  await prisma.review.deleteMany({
+    where: { id: { in: ids } }
+  });
+
+  revalidatePath(`/dashboard/admin/campaigns/${campaign_id}`);
+  return { success: true };
+}
+
+export async function transferReviews(ids: string[], current_campaign_id: string, target_campaign_id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Unauthorized");
+
+  await prisma.review.updateMany({
+    where: { id: { in: ids } },
+    data: { campaign_id: target_campaign_id }
+  });
+
+  revalidatePath(`/dashboard/admin/campaigns/${current_campaign_id}`);
+  revalidatePath(`/dashboard/admin/campaigns/${target_campaign_id}`);
+  return { success: true };
+}

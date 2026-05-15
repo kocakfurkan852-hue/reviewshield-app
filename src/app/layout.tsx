@@ -31,7 +31,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${outfit.variable}`}>
-      <body className="font-sans bg-slate-950">
+      <body className="font-sans">
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

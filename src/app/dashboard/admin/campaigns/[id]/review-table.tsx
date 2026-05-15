@@ -13,6 +13,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { createRemovalRequest } from "@/app/actions/removal_request";
+import { deleteReviews, transferReviews } from "@/app/actions/review";
+import { getTransferableCampaigns } from "@/app/actions/campaign";
+import { Trash2, MoveRight } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Review {
   id: string;
@@ -28,6 +32,10 @@ export function ReviewTable({ campaignId, reviews, client }: { campaignId: strin
   const [selectedReviewIds, setSelectedReviewIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [showAutoModal, setShowAutoModal] = useState(false);
+  
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [targetCampaign, setTargetCampaign] = useState("");
+  const [transferableCampaigns, setTransferableCampaigns] = useState<any[]>([]);
 
   // Settings State
   const [delCountry, setDelCountry] = useState(client?.deletion_country || "Deutschland");
@@ -59,6 +67,48 @@ export function ReviewTable({ campaignId, reviews, client }: { campaignId: strin
     } catch (error) {
       console.error("Failed to create removal request:", error);
       alert("Failed to update status. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedReviewIds.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedReviewIds.length} review(s)?`)) return;
+
+    setSubmitting(true);
+    try {
+      await deleteReviews(selectedReviewIds, campaignId);
+      setSelectedReviewIds([]);
+    } catch (error) {
+      alert("Failed to delete reviews.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openTransferModal = async () => {
+    setSubmitting(true);
+    try {
+      const camps = await getTransferableCampaigns(campaignId);
+      setTransferableCampaigns(camps);
+      setShowTransferModal(true);
+    } catch (error) {
+      alert("Failed to load campaigns.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleBulkTransfer = async () => {
+    if (selectedReviewIds.length === 0 || !targetCampaign) return;
+    setSubmitting(true);
+    try {
+      await transferReviews(selectedReviewIds, campaignId, targetCampaign);
+      setSelectedReviewIds([]);
+      setShowTransferModal(false);
+    } catch (error) {
+      alert("Failed to transfer reviews.");
     } finally {
       setSubmitting(false);
     }
@@ -229,17 +279,70 @@ export function ReviewTable({ campaignId, reviews, client }: { campaignId: strin
           <div className="text-sm font-medium text-foreground">
             {selectedReviewIds.length} review(s) selected
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={openTransferModal} 
+              className="border-border text-foreground hover:bg-primary/10"
+              disabled={submitting}
+            >
+              <MoveRight className="h-4 w-4 mr-2" />
+              Transfer
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handleBulkDelete} 
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 border-border"
+              disabled={submitting}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
             <Button 
               size="sm" 
               onClick={() => setShowAutoModal(true)} 
               className="starlight-btn"
+              disabled={submitting}
             >
-              Automate Removal Requests
+              Automate Removal
             </Button>
           </div>
         </div>
       )}
+
+      {/* Transfer Modal */}
+      <Dialog open={showTransferModal} onOpenChange={setShowTransferModal}>
+        <DialogContent className="max-w-md bg-background border-border">
+          <DialogHeader>
+            <DialogTitle>Transfer {selectedReviewIds.length} Review(s)</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>Select Target Campaign</Label>
+              <select 
+                value={targetCampaign} 
+                onChange={(e) => setTargetCampaign(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="" disabled>-- Select a Campaign --</option>
+                {transferableCampaigns.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.client.company_name} - {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={() => setShowTransferModal(false)} disabled={submitting}>Cancel</Button>
+              <Button className="starlight-btn" onClick={handleBulkTransfer} disabled={submitting || !targetCampaign}>
+                Confirm Transfer
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Table>
         <TableHeader>

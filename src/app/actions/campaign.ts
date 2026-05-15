@@ -130,3 +130,25 @@ export async function getCampaignEmails(campaignId: string) {
 
   return JSON.parse(JSON.stringify(emails));
 }
+
+export async function getTransferableCampaigns(currentCampaignId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Unauthorized");
+
+  const campaigns = await prisma.campaign.findMany({
+    where: { 
+      id: { not: currentCampaignId },
+      status: 'ACTIVE'
+    },
+    select: {
+      id: true,
+      name: true,
+      client: {
+        select: { company_name: true }
+      }
+    },
+    orderBy: { created_at: 'desc' }
+  });
+
+  return JSON.parse(JSON.stringify(campaigns));
+}

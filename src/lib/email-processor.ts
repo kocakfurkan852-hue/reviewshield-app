@@ -27,15 +27,63 @@ export async function processEmail({
     };
   }
 
-  // We need to associate this email with a campaign.
-  // Extract ticket ID from subject e.g., [Ticket ID: 1-12345]
-  const ticketMatch = subject?.match(/\[Ticket ID: ([^\]]+)\]/);
+  // Extract ticket ID from subject. Google tickets are typically like [0-1234000000000] or [Ticket ID: 1-12345]
+  const ticketMatch = subject?.match(/\[(?:Ticket ID:\s*)?([0-9]-[0-9]+)\]/i);
   const googleTicketId = ticketMatch ? ticketMatch[1] : null;
 
   let campaignId: string | null = null;
   let removalRequestId: string | null = null;
 
-  if (googleTicketId) {
+  // Try to find a ReviewShieldRef in the body (hidden tracking code)
+  const refMatch = bodyData?.match(/ReviewShieldRef:\s*([a-f0-9\-]{36})/i);
+  const reviewIdFromRef = refMatch ? refMatch[1] : null;
+
+  if (reviewIdFromRef) {
+    const review = await prisma.review.findUnique({
+      where: { id: reviewIdFromRef },
+      select: { campaign_id: true }
+    });
+    if (review) {
+      campaignId = review.campaign_id;
+      
+      // Check if a removal request already exists for this review with this ticket ID
+      const existingReq = await prisma.removalRequestReview.findFirst({
+        where: { review_id: reviewIdFromRef },
+        include: { removal_request: true }
+      });
+
+      if (existingReq) {
+        removalRequestId = existingReq.removal_request_id;
+        // Update ticket ID if we just discovered it (e.g. from the auto-reply)
+        if (googleTicketId && !existingReq.removal_request.google_reference_id) {
+          await prisma.removalRequest.update({
+            where: { id: removalRequestId },
+            data: { google_reference_id: googleTicketId }
+          });
+        }
+      } else {
+        // Create a new Removal Request since we received an email but had no request tracked
+        // This handles the auto-reply ingestion beautifully
+        const newReq = await prisma.removalRequest.create({
+          data: {
+            campaign_id: campaignId,
+            submitted_by_user_id: (await prisma.user.findFirst({ where: { role: 'ADMIN' } }))!.id, // fallback admin
+            submission_type: 'API',
+            submitted_at: new Date(),
+            google_reference_id: googleTicketId,
+            notes: "Auto-created from Zapier ingestion",
+            removal_request_reviews: {
+              create: { review_id: reviewIdFromRef }
+            }
+          }
+        });
+        removalRequestId = newReq.id;
+      }
+    }
+  }
+
+  // If no Ref found, try matching by Ticket ID directly
+  if (!campaignId && googleTicketId) {
     const request = await prisma.removalRequest.findFirst({
       where: { google_reference_id: googleTicketId },
       select: { id: true, campaign_id: true }
@@ -46,10 +94,10 @@ export async function processEmail({
     }
   }
 
-  // Fallback: Pick the first active campaign if nothing matches.
+  // Fallback: Pick the first active campaign ONLY if we are absolutely desperate, 
+  // but this is dangerous, so we'll just return an error to avoid dumping unrelated emails into Client 1.
   if (!campaignId) {
-    const fallback = await prisma.campaign.findFirst({ where: { status: 'ACTIVE' } });
-    if (fallback) campaignId = fallback.id;
+    return { success: false, reason: "No campaign or tracking ref associated with this email." };
   }
 
   if (campaignId && threadId) {
