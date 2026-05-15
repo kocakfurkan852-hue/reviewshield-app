@@ -289,7 +289,5 @@ export async function processEmail({
       ai_confidence: aiAnalysis.confidence,
       draft_generated: parsedAction === "NEEDS_INFO" && responseCode !== "UNKNOWN"
     };
-  }
-
-  return { success: false, reason: "No campaign associated" };
 }
+
