@@ -10,34 +10,14 @@ import {
   DialogHeader, 
   DialogTitle 
 } from "@/components/ui/dialog";
-import { RefreshCcw, MailPlus } from "lucide-react";
+import { MailPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export function AdminQuickActions({ campaigns = [] }: { campaigns?: { id: string, name: string, client?: { company_name: string } }[] }) {
-  const [syncing, setSyncing] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
   const router = useRouter();
-
-  const handleManualSync = async () => {
-    setSyncing(true);
-    setMessage("");
-    try {
-      const res = await fetch("/api/admin/sync-emails", { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        setMessage(`Synced successfully. Processed ${data.processed} emails.`);
-        router.refresh();
-      } else {
-        setMessage(data.error || "Failed to sync.");
-      }
-    } catch (err: any) {
-      setMessage("Failed to trigger sync.");
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const handleManualSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -78,15 +58,6 @@ export function AdminQuickActions({ campaigns = [] }: { campaigns?: { id: string
   return (
     <>
       <div className="flex gap-4 mb-4">
-        <Button 
-          onClick={handleManualSync} 
-          disabled={syncing}
-          variant="outline"
-          className="border-primary/20 text-primary hover:bg-primary/10"
-        >
-          <RefreshCcw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-          {syncing ? "Syncing..." : "Sync Gmail Now"}
-        </Button>
         <Button 
           onClick={() => setShowManualModal(true)} 
           variant="outline"

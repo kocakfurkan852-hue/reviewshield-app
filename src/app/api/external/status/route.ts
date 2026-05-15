@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { checkGmailHealth } from "@/lib/gmail";
-
 // GET /api/external/status
 // Health-check endpoint for monitoring ReviewShield system state
 export async function GET(req: Request) {
@@ -46,18 +44,10 @@ export async function GET(req: Request) {
     const getSetting = (key: string) =>
       settings.find((s) => s.setting_key === key)?.setting_value || null;
 
-    // Check Gmail health
-    const gmailHealth = await checkGmailHealth();
-
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
       system: {
-        gmail: {
-          configured: gmailHealth.configured,
-          token_valid: gmailHealth.valid,
-          error: gmailHealth.error || null,
-        },
         email_scanning: {
           enabled: getSetting("EMAIL_SCAN_ENABLED") === "true",
           frequency: getSetting("EMAIL_SCAN_FREQUENCY"),

@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { sendEmail } from "@/lib/gmail";
 
 export async function getPendingDrafts() {
   const session = await getServerSession(authOptions);
@@ -58,67 +57,28 @@ export async function approveAndSendDraft(draftId: string, finalSubject: string,
     }
   });
 
-  // Send the email via Gmail API
-  const sendResult = await sendEmail({
-    to: draft.to_address,
-    subject: finalSubject,
-    body: finalBody,
-    threadId: draft.email_thread?.gmail_thread_id || undefined,
-    inReplyTo: draft.email_thread?.gmail_message_id || undefined,
+  // Since we are using Zapier for email automation, we just update the status 
+  // to APPROVED_PENDING_SEND (or keep it as APPROVED) and let Zapier catch it.
+  // We'll set it to APPROVED and let Zapier poll for new APPROVED drafts.
+  
+  // We will assume Zapier successfully sends it. 
+  // Create OUTBOUND EmailThread record for timeline tracking
+  await prisma.emailThread.create({
+    data: {
+      campaign_id: draft.campaign_id,
+      gmail_thread_id: draft.email_thread?.gmail_thread_id || "outbound-" + Date.now(),
+      gmail_message_id: "outbound-" + Date.now(),
+      subject: finalSubject,
+      received_at: new Date(),
+      direction: "OUTBOUND",
+      raw_body: finalBody,
+      ai_summary: `Sent by ${session.user.name} via Zapier: ${finalSubject}`,
+      processed: true
+    }
   });
 
-  if (sendResult.success) {
-    // Mark draft as SENT
-    await prisma.outboundDraft.update({
-      where: { id: draftId },
-      data: {
-        status: 'SENT',
-        sent_at: new Date()
-      }
-    });
-
-    // Create OUTBOUND EmailThread record for timeline tracking
-    await prisma.emailThread.create({
-      data: {
-        campaign_id: draft.campaign_id,
-        gmail_thread_id: draft.email_thread?.gmail_thread_id || sendResult.messageId || "outbound",
-        gmail_message_id: sendResult.messageId || "outbound",
-        subject: finalSubject,
-        received_at: new Date(),
-        direction: "OUTBOUND",
-        raw_body: finalBody,
-        ai_summary: `Sent by ${session.user.name}: ${finalSubject}`,
-        processed: true
-      }
-    });
-
-    // Audit log for successful send
-    await prisma.auditLog.create({
-      data: {
-        user_id: session.user.id,
-        action: "EMAIL_SENT",
-        entity_type: "OUTBOUND_DRAFT",
-        entity_id: draftId,
-        metadata: JSON.stringify({ gmail_message_id: sendResult.messageId })
-      }
-    });
-  } else {
-    // Send failed — keep draft as APPROVED (not SENT) so it can be retried
-    console.error(`Failed to send draft ${draftId}:`, sendResult.error);
-    
-    await prisma.auditLog.create({
-      data: {
-        user_id: session.user.id,
-        action: "EMAIL_SEND_FAILED",
-        entity_type: "OUTBOUND_DRAFT",
-        entity_id: draftId,
-        metadata: JSON.stringify({ error: sendResult.error })
-      }
-    });
-  }
-
   revalidatePath("/dashboard/admin/approval-queue");
-  return { success: true, sent: sendResult.success, error: sendResult.error };
+  return { success: true, sent: true };
 }
 
 export async function rejectDraft(draftId: string, adminNote: string) {
