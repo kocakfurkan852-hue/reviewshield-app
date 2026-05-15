@@ -1,7 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { parseGoogleResponse, generateEmailResponse } from "@/lib/claude";
-import { generateDraft } from "@/lib/draft";
 
+/**
+ * Core email processing pipeline.
+ * 
+ * Flow:
+ * 1. Deduplicate by gmail_message_id
+ * 2. Match email → campaign via ReviewShieldRef, Ticket ID, or business name
+ * 3. Classify email using AI + KnowledgeBase rules
+ * 4. Update review status based on classification
+ * 5. Generate templated draft reply if ACTION_REQUIRED
+ * 6. Auto-learn: log unknown patterns for future KB growth
+ */
 export async function processEmail({
   subject,
   bodyData,
@@ -15,7 +25,7 @@ export async function processEmail({
   threadId: string;
   forcedCampaignId?: string;
 }) {
-  // Check for existing message to avoid duplicates
+  // ── Step 1: Deduplication ──
   const existing = await prisma.emailThread.findFirst({
     where: { gmail_message_id: messageId }
   });
@@ -29,14 +39,14 @@ export async function processEmail({
     };
   }
 
-  // Extract ticket ID from subject. Google tickets are typically like [0-1234000000000] or [Ticket ID: 1-12345]
+  // ── Step 2: Match to Campaign ──
   const ticketMatch = subject?.match(/\[(?:Ticket ID:\s*)?([0-9]-[0-9]+)\]/i);
   const googleTicketId = ticketMatch ? ticketMatch[1] : null;
 
   let campaignId: string | null = forcedCampaignId || null;
   let removalRequestId: string | null = null;
 
-  // Try to find a ReviewShieldRef in the body (hidden tracking code)
+  // 2a: Try ReviewShieldRef in body
   const refMatch = bodyData?.match(/ReviewShieldRef:\s*([a-f0-9\-]{36})/i);
   const reviewIdFromRef = refMatch ? refMatch[1] : null;
 
@@ -48,7 +58,6 @@ export async function processEmail({
     if (review) {
       campaignId = review.campaign_id;
       
-      // Check if a removal request already exists for this review with this ticket ID
       const existingReq = await prisma.removalRequestReview.findFirst({
         where: { review_id: reviewIdFromRef },
         include: { removal_request: true }
@@ -56,7 +65,6 @@ export async function processEmail({
 
       if (existingReq) {
         removalRequestId = existingReq.removal_request_id;
-        // Update ticket ID if we just discovered it (e.g. from the auto-reply)
         if (googleTicketId && !existingReq.removal_request.google_reference_id) {
           await prisma.removalRequest.update({
             where: { id: removalRequestId },
@@ -64,12 +72,10 @@ export async function processEmail({
           });
         }
       } else {
-        // Create a new Removal Request since we received an email but had no request tracked
-        // This handles the auto-reply ingestion beautifully
         const newReq = await prisma.removalRequest.create({
           data: {
             campaign_id: campaignId,
-            submitted_by_user_id: (await prisma.user.findFirst({ where: { role: 'ADMIN' } }))!.id, // fallback admin
+            submitted_by_user_id: (await prisma.user.findFirst({ where: { role: 'ADMIN' } }))!.id,
             submission_type: 'API',
             submitted_at: new Date(),
             google_reference_id: googleTicketId,
@@ -84,7 +90,7 @@ export async function processEmail({
     }
   }
 
-  // If no Ref found, try matching by Ticket ID directly
+  // 2b: Try Ticket ID match
   if (!campaignId && googleTicketId) {
     const request = await prisma.removalRequest.findFirst({
       where: { google_reference_id: googleTicketId },
@@ -96,11 +102,10 @@ export async function processEmail({
     }
   }
 
-  // Fallback 1: Try matching business name in subject or body
+  // 2c: Try business name fuzzy match
   if (!campaignId) {
     const clients = await prisma.client.findMany({ select: { id: true, company_name: true }});
     for (const client of clients) {
-      // Very basic text match (case insensitive)
       const nameLower = client.company_name.toLowerCase();
       if (subject.toLowerCase().includes(nameLower) || bodyData.toLowerCase().includes(nameLower)) {
          const campaign = await prisma.campaign.findFirst({ where: { client_id: client.id, status: "ACTIVE" }});
@@ -112,18 +117,18 @@ export async function processEmail({
     }
   }
 
-  // Fallback 2: Pick the first active campaign ONLY if we are absolutely desperate, 
-  // but this is dangerous, so we'll just return an error to avoid dumping unrelated emails into Client 1.
+  // 2d: No match → reject (never dump into random campaign)
   if (!campaignId) {
     return { success: false, reason: "No campaign or tracking ref associated with this email." };
   }
 
   if (campaignId && threadId) {
-    // Parse with AI
+    // ── Step 3: AI Classification (powered by KnowledgeBase) ──
     const aiAnalysis = await parseGoogleResponse(bodyData, subject || "");
     const parsedAction = aiAnalysis.parsedAction as "APPROVED" | "REJECTED" | "NEEDS_INFO" | "UNKNOWN";
+    const responseCode = aiAnalysis.responseCode || "UNKNOWN";
 
-    // Create EmailThread record
+    // ── Step 4: Create EmailThread record ──
     const emailThread = await prisma.emailThread.create({
       data: {
         campaign_id: campaignId,
@@ -136,14 +141,13 @@ export async function processEmail({
         ai_summary: aiAnalysis.summary,
         ai_parsed_action: parsedAction,
         ai_confidence: aiAnalysis.confidence,
-        google_response_type: aiAnalysis.googleResponseType,
+        google_response_type: responseCode,
         processed: true
       }
     });
 
-    // === KEY FIX: Update Review status based on AI classification ===
+    // ── Step 5: Update Review Status ──
     if (removalRequestId && parsedAction !== "UNKNOWN") {
-      // Find all reviews linked to this removal request
       const linkedReviews = await prisma.removalRequestReview.findMany({
         where: { removal_request_id: removalRequestId },
         select: { review_id: true }
@@ -170,7 +174,7 @@ export async function processEmail({
         }
       }
 
-      // Mark reminder as stale if APPROVED (no more follow-ups needed)
+      // Disable reminders on SUCCESS
       if (parsedAction === "APPROVED") {
         await prisma.reminderSchedule.updateMany({
           where: { removal_request_id: removalRequestId },
@@ -179,19 +183,36 @@ export async function processEmail({
       }
     }
 
-    // === Auto-generate draft replies for REJECTED/NEEDS_INFO ===
-    if (removalRequestId && (parsedAction === "REJECTED" || parsedAction === "NEEDS_INFO")) {
-      const scenarioKey = parsedAction === "REJECTED" ? "REJECTION_RESPONSE" : "NEEDS_INFO_RESPONSE";
-
-      // Get campaign client info for placeholders
+    // ── Step 6: Generate Draft Reply (Template-Based) ──
+    if (removalRequestId && parsedAction === "NEEDS_INFO" && responseCode !== "UNKNOWN") {
+      // Load campaign + client context for placeholder filling
       const campaign = await prisma.campaign.findUnique({
         where: { id: campaignId },
-        include: { client: true }
+        include: {
+          client: true,
+          reviews: {
+            select: { review_url: true },
+            take: 10
+          }
+        }
       });
 
       try {
         const companyName = campaign?.client.company_name || "Unknown";
-        const aiDraft = await generateEmailResponse(bodyData, scenarioKey, companyName, googleTicketId || "Unknown");
+        const authorizedName = campaign?.client.deletion_name || campaign?.client.contact_name || "Unknown";
+        const reviewUrls = campaign?.reviews.map(r => r.review_url) || [];
+
+        const draftResult = await generateEmailResponse(
+          bodyData,
+          responseCode,
+          companyName,
+          googleTicketId || "Unknown",
+          {
+            authorizedName,
+            reviewUrls,
+            googlePlaceUrl: campaign?.client.google_maps_url || undefined,
+          }
+        );
 
         await prisma.outboundDraft.create({
           data: {
@@ -199,18 +220,50 @@ export async function processEmail({
             email_thread_id: emailThread.id,
             removal_request_id: removalRequestId,
             draft_type: "REPLY",
-            rendered_subject: aiDraft.subject,
-            rendered_body: aiDraft.body,
+            rendered_subject: draftResult.subject,
+            rendered_body: draftResult.body,
             to_address: "removals@google.com",
             status: "PENDING_REVIEW"
           }
         });
       } catch (draftError) {
-        console.warn(`Could not auto-generate ${scenarioKey} draft:`, draftError);
+        console.warn(`Could not generate ${responseCode} draft:`, draftError);
       }
     }
 
-    // Audit log
+    // ── Step 7: Auto-Learn Unknown Patterns ──
+    if (responseCode === "UNKNOWN" && aiAnalysis.confidence < 70) {
+      // Log the unknown pattern for future KB growth
+      try {
+        await prisma.knowledgeBase.create({
+          data: {
+            category: "CUSTOM",
+            title: `[AUTO] Unknown Email Pattern — ${new Date().toISOString().split('T')[0]}`,
+            content: `## Unclassified Email (Auto-Captured)
+
+**Subject:** ${subject?.substring(0, 200)}
+**Key Phrases:** ${bodyData.substring(0, 500)}
+**AI Confidence:** ${aiAnalysis.confidence}%
+**AI Summary:** ${aiAnalysis.summary}
+
+### Admin Action Required
+1. Review this email content
+2. Determine the correct classification (RQ1-RQ6, SUCCESS, DECLINED)
+3. Add new trigger phrases to the "Email Classification Rules (Master)" KB entry
+4. Optionally create a new ResponseTemplate if this is a genuinely new response type
+5. Delete this auto-captured entry once processed`,
+            source: "auto-captured",
+            tags: ["auto-learn", "unknown", "needs-review", "unclassified"],
+            priority: 1,
+            active: true,
+          }
+        });
+      } catch (kbError) {
+        console.warn("Could not auto-log unknown pattern to KB:", kbError);
+      }
+    }
+
+    // ── Step 8: Audit Log ──
     await prisma.auditLog.create({
       data: {
         action: "EMAIL_PROCESSED",
@@ -218,10 +271,13 @@ export async function processEmail({
         entity_id: emailThread.id,
         metadata: JSON.stringify({
           ai_parsed_action: parsedAction,
+          response_code: responseCode,
           ai_confidence: aiAnalysis.confidence,
           campaign_id: campaignId,
           removal_request_id: removalRequestId,
-          reviews_updated: removalRequestId ? true : false
+          reviews_updated: removalRequestId ? true : false,
+          source: "template_based",
+          matched_phrase: aiAnalysis.matchedPhrase || null
         })
       }
     });
@@ -231,8 +287,10 @@ export async function processEmail({
       campaignId,
       emailThreadId: emailThread.id,
       ai_parsed_action: parsedAction,
+      response_code: responseCode,
       ai_summary: aiAnalysis.summary,
-      ai_confidence: aiAnalysis.confidence
+      ai_confidence: aiAnalysis.confidence,
+      draft_generated: parsedAction === "NEEDS_INFO" && responseCode !== "UNKNOWN"
     };
   }
 

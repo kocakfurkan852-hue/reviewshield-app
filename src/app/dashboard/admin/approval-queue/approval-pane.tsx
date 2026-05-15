@@ -12,6 +12,7 @@ interface Draft {
   rendered_subject: string;
   rendered_body: string;
   campaign?: { name: string; client?: { company_name: string } } | null;
+  removal_request?: { google_reference_id?: string | null } | null;
   email_thread?: { subject: string; raw_body: string; ai_summary?: string | null; ai_confidence?: number | null } | null;
 }
 
@@ -98,6 +99,14 @@ export function ApprovalPane({ drafts }: { drafts: Draft[] }) {
             <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-2">Campaign Details</h3>
             <p className="text-sm text-foreground"><span className="text-muted-foreground">Client:</span> {currentDraft.campaign?.client?.company_name}</p>
             <p className="text-sm text-foreground"><span className="text-muted-foreground">Campaign:</span> {currentDraft.campaign?.name}</p>
+            {currentDraft.removal_request?.google_reference_id && (
+              <p className="text-sm text-foreground mt-1">
+                <span className="text-muted-foreground">Ticket ID:</span> 
+                <span className="ml-2 font-mono bg-background px-2 py-0.5 rounded border border-border text-xs">
+                  {currentDraft.removal_request.google_reference_id}
+                </span>
+              </p>
+            )}
           </div>
 
           <div>

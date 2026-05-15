@@ -41,6 +41,7 @@ export function ReviewTable({ campaignId, reviews, client }: { campaignId: strin
   const [delCountry, setDelCountry] = useState(client?.deletion_country || "Deutschland");
   const [delName, setDelName] = useState(client?.deletion_name || client?.contact_name || "");
   const [delSignature, setDelSignature] = useState(client?.deletion_signature || client?.contact_name || "");
+  const [ticketId, setTicketId] = useState("");
 
   const selectedReviews = reviews.filter(r => selectedReviewIds.includes(r.id));
 
@@ -61,7 +62,7 @@ export function ReviewTable({ campaignId, reviews, client }: { campaignId: strin
     
     setSubmitting(true);
     try {
-      await createRemovalRequest(campaignId, selectedReviewIds, "AUTOMATED_BOOKMARKLET");
+      await createRemovalRequest(campaignId, selectedReviewIds, ticketId);
       setSelectedReviewIds([]);
       setShowAutoModal(false);
     } catch (error) {
@@ -222,6 +223,15 @@ export function ReviewTable({ campaignId, reviews, client }: { campaignId: strin
               {/* Form Settings */}
               <div className="space-y-4 border-r border-border pr-8">
                 <h3 className="text-md font-semibold text-foreground mb-2">Submission Settings</h3>
+                <div className="space-y-2">
+                  <Label>Google Ticket ID (Optional)</Label>
+                  <Input 
+                    placeholder="e.g. 1-234567890" 
+                    value={ticketId} 
+                    onChange={(e) => setTicketId(e.target.value)} 
+                  />
+                  <p className="text-[10px] text-muted-foreground">If you have the Ticket ID from Google, enter it here to link future emails automatically.</p>
+                </div>
                 <div className="space-y-2">
                   <Label>Land ihres Wohnsitzes (Country)</Label>
                   <Input value={delCountry} onChange={(e) => setDelCountry(e.target.value)} />

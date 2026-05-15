@@ -15,7 +15,8 @@ export async function getPendingDrafts() {
       campaign: {
         include: { client: true }
       },
-      email_thread: true
+      email_thread: true,
+      removal_request: true
     },
     orderBy: { created_at: 'asc' }
   });

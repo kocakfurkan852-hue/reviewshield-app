@@ -35,6 +35,7 @@ model Client {
   deletion_country   String?    @default("Deutschland")
   deletion_name      String?
   deletion_signature String?
+  google_maps_url    String?
   created_by_user_id String     @db.Uuid
   created_at         DateTime   @default(now())
   updated_at         DateTime   @updatedAt
