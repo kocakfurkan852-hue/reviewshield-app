@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { parseGoogleResponse } from "@/lib/claude";
+import { parseGoogleResponse, generateEmailResponse } from "@/lib/claude";
 import { generateDraft } from "@/lib/draft";
 
 export async function processEmail({
@@ -190,21 +190,22 @@ export async function processEmail({
       });
 
       try {
-        await generateDraft({
-          campaign_id: campaignId,
-          removal_request_id: removalRequestId,
-          email_thread_id: emailThread.id,
-          scenario_key: scenarioKey,
-          language: "DE",
-          to_address: "removals@google.com",
-          draft_type: "REPLY",
-          placeholders: {
-            client_name: campaign?.client.company_name || "Unknown",
-            google_ticket_id: googleTicketId || "Unknown",
+        const companyName = campaign?.client.company_name || "Unknown";
+        const aiDraft = await generateEmailResponse(bodyData, scenarioKey, companyName, googleTicketId || "Unknown");
+
+        await prisma.outboundDraft.create({
+          data: {
+            campaign_id: campaignId,
+            email_thread_id: emailThread.id,
+            removal_request_id: removalRequestId,
+            draft_type: "REPLY",
+            rendered_subject: aiDraft.subject,
+            rendered_body: aiDraft.body,
+            to_address: "removals@google.com",
+            status: "PENDING_REVIEW"
           }
         });
       } catch (draftError) {
-        // Don't fail the whole email processing if template is missing
         console.warn(`Could not auto-generate ${scenarioKey} draft:`, draftError);
       }
     }
