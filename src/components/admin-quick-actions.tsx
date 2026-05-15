@@ -13,7 +13,7 @@ import {
 import { RefreshCcw, MailPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-export function AdminQuickActions() {
+export function AdminQuickActions({ campaigns = [] }: { campaigns?: { id: string, name: string, client?: { company_name: string } }[] }) {
   const [syncing, setSyncing] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -48,6 +48,7 @@ export function AdminQuickActions() {
     const body = {
       subject: formData.get("subject"),
       bodyData: formData.get("bodyData"),
+      campaignId: formData.get("campaignId") || undefined,
       messageId: "manual-" + Date.now(),
       threadId: "manual-thread"
     };
@@ -107,6 +108,22 @@ export function AdminQuickActions() {
             <p className="text-xs text-muted-foreground">
               Paste the contents of an email from Google here. The AI will parse the ticket ID, link it to the correct review (if ReviewShieldRef is present), and update its status.
             </p>
+            <div className="space-y-2">
+              <Label htmlFor="campaignId">Select Campaign (Optional)</Label>
+              <select 
+                id="campaignId"
+                name="campaignId"
+                className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">-- Let AI / Matcher Find Campaign --</option>
+                {campaigns.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.client?.company_name || "Unknown"} - {c.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-muted-foreground">If you know who this email belongs to, select their campaign to bypass auto-matching.</p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="subject">Subject Line</Label>
               <Input id="subject" name="subject" required className="bg-transparent" placeholder="e.g. Re: [Ticket ID: 12345] Removal Request..." />

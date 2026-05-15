@@ -1,17 +1,23 @@
 import { getAdminDashboardStats } from "@/app/actions/dashboard";
+import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AdminQuickActions } from "@/components/admin-quick-actions";
 
 export default async function AdminDashboard() {
   const stats = await getAdminDashboardStats();
+  const campaigns = await prisma.campaign.findMany({ 
+    where: { status: "ACTIVE" },
+    select: { id: true, name: true, client: { select: { company_name: true } } },
+    orderBy: { created_at: 'desc' }
+  });
 
   return (
     <div className="p-8 bg-background min-h-screen">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-heading font-bold text-foreground">Admin Overview</h1>
-          <AdminQuickActions />
+          <AdminQuickActions campaigns={campaigns} />
         </div>
         
         {/* KPI Section */}

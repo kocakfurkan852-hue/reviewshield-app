@@ -11,7 +11,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { subject, bodyData, messageId, threadId } = body;
+    const { subject, bodyData, messageId, threadId, campaignId } = body;
 
     if (!subject || !bodyData) {
       return NextResponse.json({ error: "Subject and bodyData are required." }, { status: 400 });
@@ -21,7 +21,8 @@ export async function POST(req: Request) {
       subject,
       bodyData,
       messageId: messageId || "manual-" + Date.now(),
-      threadId: threadId || "manual-thread"
+      threadId: threadId || "manual-thread",
+      forcedCampaignId: campaignId || undefined
     });
 
     if (result.success) {

@@ -6,12 +6,14 @@ export async function processEmail({
   subject,
   bodyData,
   messageId,
-  threadId
+  threadId,
+  forcedCampaignId
 }: {
   subject: string;
   bodyData: string;
   messageId: string;
   threadId: string;
+  forcedCampaignId?: string;
 }) {
   // Check for existing message to avoid duplicates
   const existing = await prisma.emailThread.findFirst({
@@ -31,7 +33,7 @@ export async function processEmail({
   const ticketMatch = subject?.match(/\[(?:Ticket ID:\s*)?([0-9]-[0-9]+)\]/i);
   const googleTicketId = ticketMatch ? ticketMatch[1] : null;
 
-  let campaignId: string | null = null;
+  let campaignId: string | null = forcedCampaignId || null;
   let removalRequestId: string | null = null;
 
   // Try to find a ReviewShieldRef in the body (hidden tracking code)
